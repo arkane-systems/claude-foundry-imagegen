@@ -133,6 +133,31 @@ The image server runs on your computer, so the images you want to edit have to b
   click **Send to Claude**. **Cancel** stops the request. You can also give Claude the image's path
   on your computer, for example `C:\Users\you\Pictures\photo.jpg` or a network path.
 
+Examples in Claude Desktop:
+
+> *(photo attached)* Turn this into a watercolor painting.
+
+Claude can see the attachment but the image server can't, so Claude opens the upload panel. Drop,
+choose, or paste **the same photo** and click **Send to Claude**. Claude then refines the prompt as
+usual, shows it to you, and runs the edit.
+
+> I've got a photo of my dog somewhere in my Pictures. Put a little party hat on him.
+
+Claude opens the panel instead of guessing where the file is. You can also just reply with the path.
+
+> Put our logo on this mug photo, like it was printed on it.
+
+The panel accepts both images. Claude's prompt says which image is the mug to edit and which is the
+logo to apply.
+
+> I just copied a screenshot of our settings page. Make a dark-mode version of it.
+
+Click in the panel and press Ctrl+V (⌘V). The pasted image needs no file.
+
+Click **Cancel** to stop. Claude asks how you'd like to continue. The panel doesn't appear for
+images generated earlier in the conversation, since Claude already has their paths, or when you
+give a path yourself.
+
 Uploaded copies are temporary: they're kept in the plugin's cache folder only while the server is
 running, and leftovers are removed after 24 hours. `index.jsonl` records an uploaded image by its
 original file name, size, and SHA-256 hash, so you can still tell which file an edit started from.
