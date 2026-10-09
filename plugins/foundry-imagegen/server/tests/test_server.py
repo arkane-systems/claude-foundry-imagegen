@@ -89,3 +89,21 @@ async def test_gallery_requests_clipboard_permission():
         content = await client.read_resource(gallery.uri)
     meta = content.contents[0].meta or gallery.meta
     assert meta["ui"]["permissions"] == {"clipboardWrite": {}}
+
+
+@respx.mock
+async def test_copy_to_clipboard_tool(settings, monkeypatch):
+    calls = []
+
+    async def fake_copy(kind, path):
+        calls.append((kind, path))
+
+    monkeypatch.setattr(server, "copy_to_clipboard", fake_copy)
+    respx.post(f"{V1}/generations").mock(return_value=ok())
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("generate_image", {"prompt": "x"})
+        path = result.structured_content["images"][0]["path"]
+        copied = await client.call_tool("copy_image_to_clipboard", {"path": path, "content": "image"})
+        assert not copied.is_error and calls == [("image", Path(path))]
+        denied = await client.call_tool("copy_image_to_clipboard", {"path": "/etc/passwd", "content": "path"})
+        assert denied.is_error

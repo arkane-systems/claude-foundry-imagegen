@@ -1,7 +1,7 @@
 {
   "name": "foundry-imagegen",
   "displayName": "Foundry Image Generation",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Generate and edit images with a GPT-image model (e.g. gpt-image-2.5-flare) deployed on Microsoft Foundry. Refines your prompt, respects the deployment's rate limit, saves full-resolution files, and shows an in-chat gallery.",
   "author": {
     "name": "Alistair Young",

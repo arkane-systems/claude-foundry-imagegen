@@ -28,7 +28,7 @@ type ContentBlock = { type: string; text?: string; data?: string; mimeType?: str
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.1" }, { availableDisplayModes: ["inline", "fullscreen"] });
+const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.2" }, { availableDisplayModes: ["inline", "fullscreen"] });
 
 function applyContext(ctx: McpUiHostContext | undefined): void {
   if (!ctx) return;
@@ -149,19 +149,40 @@ async function pngBlob(info: ImageInfo): Promise<Blob> {
   );
 }
 
+/** Ask the server (a normal local process) to use the OS clipboard; sandboxed frames often can't. */
+async function serverCopy(info: ImageInfo, content: "image" | "path"): Promise<string | null> {
+  try {
+    const result = await app.callServerTool({ name: "copy_image_to_clipboard", arguments: { path: info.path, content } });
+    return result.isError ? textOf(result.content as ContentBlock[]) || "Copy failed" : null;
+  } catch (err) {
+    return (err as Error).message;
+  }
+}
+
 async function copyImage(info: ImageInfo): Promise<void> {
-  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
-    toast("This host doesn't allow copying images — use Download instead");
+  const serverError = await serverCopy(info, "image");
+  if (serverError === null) {
+    toast("Image copied");
     return;
   }
-  try {
-    // Pass the blob as a promise so the write starts inside the click's user activation.
-    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob(info) })]);
-    toast("Image copied");
-  } catch (err) {
-    const denied = (err as Error).name === "NotAllowedError";
-    toast(denied ? "This host doesn't allow copying images — use Download instead" : `Copy failed: ${(err as Error).message}`);
+  if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob(info) })]);
+      toast("Image copied");
+      return;
+    } catch {
+      // Not permitted in this frame either; report the server's reason below.
+    }
   }
+  toast(`Couldn't copy the image: ${serverError}`);
+}
+
+async function copyPath(info: ImageInfo, anchor: HTMLElement): Promise<void> {
+  if ((await serverCopy(info, "path")) === null) {
+    toast("Path copied");
+    return;
+  }
+  await copyText(info.path, anchor);
 }
 
 type Action = { label: string; run: (anchor: HTMLButtonElement) => void };
@@ -171,7 +192,7 @@ function actionsFor(info: ImageInfo, canDownload: boolean): Action[] {
   if (canDownload) actions.push({ label: "Download", run: (btn) => void download(info, btn) });
   actions.push({ label: "Copy image", run: () => void copyImage(info) });
   actions.push({ label: "Show in folder", run: () => void reveal(info) });
-  actions.push({ label: "Copy path", run: (btn) => void copyText(info.path, btn) });
+  actions.push({ label: "Copy path", run: (btn) => void copyPath(info, btn) });
   return actions;
 }
 

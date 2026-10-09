@@ -17,6 +17,7 @@ from mcp_types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 from pydantic import Field
 
 from . import __version__
+from .clipboard import ClipboardError, copy_to_clipboard
 from .client import FoundryError, FoundryImageClient, ImageResponse
 from .config import ConfigError, Settings, config_file_path, expand_path, load_settings
 from .images import (
@@ -335,6 +336,26 @@ def reveal_image(path: str) -> CallToolResult:
         return _error(f"Could not open the file manager: {exc}")
     return CallToolResult(content=[TextContent(type="text", text=f"Opened {resolved.parent}")])
 
+
+
+@apps.tool(
+    resource_uri=GALLERY_URI,
+    visibility=["app"],
+    description="Copy a generated image (or its file path) to the system clipboard.",
+)
+async def copy_image_to_clipboard(
+    path: str,
+    content: Annotated[str, Field(description="'image' or 'path'")] = "image",
+) -> CallToolResult:
+    if content not in ("image", "path"):
+        return _error("content must be 'image' or 'path'.")
+    try:
+        resolved = _check_path(path)
+        await copy_to_clipboard(content, resolved)  # type: ignore[arg-type]
+    except (ConfigError, ValidationError, ClipboardError) as exc:
+        return _error(str(exc))
+    what = "Image" if content == "image" else "Path"
+    return CallToolResult(content=[TextContent(type="text", text=f"{what} copied to the clipboard.")])
 
 apps.add_html_resource(
     GALLERY_URI,
