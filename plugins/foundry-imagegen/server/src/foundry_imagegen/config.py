@@ -69,6 +69,9 @@ class Settings:
 
 
 def config_file_path() -> Path:
+    override = _clean(os.environ.get(ENV_PREFIX + "CONFIG_FILE"))
+    if override:
+        return Path(override).expanduser()
     return Path(platformdirs.user_config_dir(APP_NAME, appauthor=False)) / "config.toml"
 
 
@@ -146,7 +149,8 @@ def _resolve_project_dir(raw: str | None) -> Path | None:
 def load_settings(env: dict[str, str] | None = None, config_path: Path | None = None) -> Settings:
     """Resolve settings; raises ConfigError naming what is missing and where to set it."""
     env = dict(os.environ if env is None else env)
-    path = config_path or Path(_clean(env.get(ENV_PREFIX + "CONFIG_FILE")) or config_file_path())
+    override = _clean(env.get(ENV_PREFIX + "CONFIG_FILE"))
+    path = config_path or (Path(override).expanduser() if override else config_file_path())
     file_values = _read_config_file(path)
     sources: dict[str, str] = {}
 
