@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import subprocess
 import sys
@@ -32,12 +33,15 @@ from .ratelimit import RateLimitExceeded
 
 GALLERY_URI = "ui://foundry-imagegen/gallery.html"
 
+# httpx logs every request at INFO; keep the MCP server log to what matters.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 INSTRUCTIONS = """\
 Generates and edits images with a GPT-image model deployed on Microsoft Foundry.
 Before calling generate_image or edit_image, follow the `imagine` skill (if available) to turn the
 user's idea into a structured prompt and pick parameters. The deployment allows only a few requests
-per minute (typically 5): ask for variations with `n` in one call instead of repeated calls; calls
-queue automatically when the limit is reached. Results are saved to disk; the tool result lists the
+per minute (often 2–5; check_config shows the limit): ask for variations with `n` in one call instead
+of repeated calls; calls queue automatically when the limit is reached. Results are saved to disk; the tool result lists the
 file paths and includes downscaled previews for you to review. Use check_config to diagnose setup."""
 
 _state: dict[str, Any] = {}

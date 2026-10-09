@@ -17,7 +17,7 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | `edit_image` tool | Edits an image, or composes from up to 16 reference images, with an optional mask |
 | `check_config` tool | Checks your endpoint, key, and deployments, and shows the rate-limit state |
 | Gallery widget | In Claude Desktop, shows results with **Download**, **Show in folder**, and **Copy path** buttons |
-| Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows 5). The queue is shared across all Claude sessions on the machine, and it honors the service's `Retry-After` |
+| Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
 
 Images are saved to `./generated-images/` in a Claude Code project. Outside a project they go to
 `~/Pictures/Foundry Images`. Each folder also gets an `index.jsonl` that records the prompt and
@@ -103,7 +103,7 @@ each setting came from. The key is masked in that output.
 | `api_key` | – (required) | Stored securely by Claude Code and Claude Desktop |
 | `deployment` | `gpt-image-2.5-flare` | Default deployment |
 | `extra_deployments` | – | Comma-separated. Claude can choose these per request, for example Sunburst for final renders |
-| `rpm_limit` | `5` | Your deployment's requests-per-minute quota |
+| `rpm_limit` | `5` | Your deployment's requests-per-minute quota. If the service reports a lower limit (`x-ratelimit-limit-requests`), that limit is used instead. `check_config` shows both |
 | `max_wait_seconds` | `240` | Longest a request waits in the queue before it returns a "retry at" time instead |
 | `output_dir` | auto | Empty means `./generated-images` in a project, otherwise `~/Pictures/Foundry Images` |
 | `api_version` | `2025-04-01-preview` | Used only if your resource doesn't serve the GA `/openai/v1` API |

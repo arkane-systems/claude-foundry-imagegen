@@ -80,8 +80,9 @@ Before calling the tool, show the user the final prompt and settings in a compac
 of settings, then the prompt). Proceed without waiting **unless** the request is costly — n > 4,
 quality `xhigh`/`max`, or more than ~4 megapixels — in which case confirm first.
 
-The deployment allows only about 5 requests per minute. Calls queue automatically when the limit
-is hit (the tool reports progress); don't fire parallel calls — use `n` instead.
+The deployment allows only a few requests per minute (often 2–5; the tool result reports usage
+against the limit). Calls queue automatically when the limit is hit (the tool reports progress);
+don't fire parallel calls — use `n` instead.
 
 ### 6. Review the result
 The tool returns downscaled previews you can see. Check them against the spec: spelling of any text,

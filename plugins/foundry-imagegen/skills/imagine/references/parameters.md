@@ -26,8 +26,8 @@
 - Labels are not comparable across models (Flare `high` ≠ Sunburst `high`).
 
 ## n
-1–10 images in **one request**. With a quota of ~5 requests per minute, asking for `n: 4` once is far
-better than four separate calls.
+1–10 images in **one request**. With a quota of only a few requests per minute, asking for `n: 4`
+once is far better than four separate calls.
 
 ## output_format and output_compression
 - `png` (default, lossless, supports transparency), `jpeg` (smaller; no alpha). `webp` is accepted by
@@ -46,8 +46,9 @@ Omit to use the configured default. Typical pairing:
 Only deployments listed in the plugin/extension settings can be used (`check_config` lists them).
 
 ## Rate limit and timing
-- gpt-image-2.5 GlobalStandard deployments allow **5 requests per minute**. The server queues calls
-  when the limit is reached, shares the quota between all sessions on the machine, and honors the
+- gpt-image-2.5 GlobalStandard deployments allow **at most 5 requests per minute**, and a deployment
+  may be provisioned lower (the service reports its limit in `x-ratelimit-limit-requests`; the server
+  adopts it automatically). The server queues calls when the limit is reached, shares the quota between all sessions on the machine, and honors the
   service's Retry-After on 429s. If the wait would exceed the configured maximum, the tool returns the
   time when the next slot opens.
 - A render typically takes 10–60 s; large or `xhigh`/`max` renders take longer.
