@@ -1,0 +1,18 @@
+{
+  "name": "foundry-imagegen-gallery",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MCP App gallery widget for foundry-imagegen; builds a single HTML file into the server package.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3"
+  }
+}

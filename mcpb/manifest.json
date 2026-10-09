@@ -1,0 +1,104 @@
+{
+  "manifest_version": "0.4",
+  "name": "foundry-imagegen",
+  "display_name": "Foundry Image Generation",
+  "version": "0.1.0",
+  "description": "Generate and edit images with a GPT-image model deployed on Microsoft Foundry, with an in-chat gallery.",
+  "long_description": "Gives Claude image generation and editing through your own Microsoft Foundry deployment of a GPT-image model (such as gpt-image-2.5-flare). Supports reference images, masks, sizes up to 4K, quality levels, transparent backgrounds, and multiple variations per request. Requests are queued to respect the deployment's requests-per-minute quota. Images are saved to a folder you choose and shown in a gallery with download buttons. Pair it with the foundry-imagegen plugin for the `imagine` prompting skill.",
+  "author": {
+    "name": "Alistair Young",
+    "email": "avatar@arkane-systems.net"
+  },
+  "homepage": "https://github.com/arkane-systems/claude-foundry-imagegen",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arkane-systems/claude-foundry-imagegen"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": ["image-generation", "azure", "microsoft-foundry", "gpt-image"],
+  "server": {
+    "type": "uv",
+    "entry_point": "src/foundry_imagegen/__main__.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "--frozen", "--no-dev", "--quiet", "foundry-imagegen"],
+      "env": {
+        "FOUNDRY_IMAGEGEN_ENDPOINT": "${user_config.endpoint}",
+        "FOUNDRY_IMAGEGEN_API_KEY": "${user_config.api_key}",
+        "FOUNDRY_IMAGEGEN_DEPLOYMENT": "${user_config.deployment}",
+        "FOUNDRY_IMAGEGEN_EXTRA_DEPLOYMENTS": "${user_config.extra_deployments}",
+        "FOUNDRY_IMAGEGEN_RPM_LIMIT": "${user_config.rpm_limit}",
+        "FOUNDRY_IMAGEGEN_MAX_WAIT_SECONDS": "${user_config.max_wait_seconds}",
+        "FOUNDRY_IMAGEGEN_OUTPUT_DIR": "${user_config.output_dir}",
+        "FOUNDRY_IMAGEGEN_API_VERSION": "${user_config.api_version}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "generate_image", "description": "Generate images from a text prompt." },
+    { "name": "edit_image", "description": "Edit an image or compose from reference images, optionally with a mask." },
+    { "name": "check_config", "description": "Check the endpoint, key, deployments, and rate-limit state." }
+  ],
+  "user_config": {
+    "endpoint": {
+      "type": "string",
+      "title": "Foundry endpoint",
+      "description": "Your Foundry / Azure OpenAI resource URL, e.g. https://<resource>.services.ai.azure.com",
+      "required": true
+    },
+    "api_key": {
+      "type": "string",
+      "title": "API key",
+      "description": "Key for the Foundry resource (Keys and Endpoint in the portal).",
+      "sensitive": true,
+      "required": true
+    },
+    "deployment": {
+      "type": "string",
+      "title": "Default deployment",
+      "description": "Name of the image model deployment to use by default.",
+      "default": "gpt-image-2.5-flare"
+    },
+    "extra_deployments": {
+      "type": "string",
+      "title": "Additional deployments",
+      "description": "Optional comma-separated list of other image deployments on the same resource, e.g. gpt-image-2.5-sunburst.",
+      "default": ""
+    },
+    "rpm_limit": {
+      "type": "number",
+      "title": "Requests per minute",
+      "description": "The deployment's request quota. gpt-image-2.5 GlobalStandard deployments allow 5.",
+      "default": 5,
+      "min": 1,
+      "max": 1000
+    },
+    "max_wait_seconds": {
+      "type": "number",
+      "title": "Max queue wait (seconds)",
+      "description": "How long a request may wait for a rate-limit slot before giving up with a retry time.",
+      "default": 240,
+      "min": 0,
+      "max": 3600
+    },
+    "output_dir": {
+      "type": "directory",
+      "title": "Output folder",
+      "description": "Where generated images are saved.",
+      "default": "${HOME}/Pictures/Foundry Images"
+    },
+    "api_version": {
+      "type": "string",
+      "title": "Legacy API version",
+      "description": "api-version for the deployment-scoped route, used only if the resource does not serve the v1 API.",
+      "default": "2025-04-01-preview"
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.11"
+    }
+  }
+}

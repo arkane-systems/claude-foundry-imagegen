@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry image gallery</title>
+<style>/*STYLE*/</style>
+</head>
+<body>
+<main id="app">
+  <section id="status" class="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <div>
+      <div id="status-title" class="status-title">Waiting for the image request…</div>
+      <div id="status-detail" class="status-detail"></div>
+    </div>
+  </section>
+  <section id="result" hidden>
+    <header class="meta">
+      <p id="prompt" class="prompt"></p>
+      <p id="details" class="details"></p>
+    </header>
+    <div id="grid" class="grid"></div>
+  </section>
+  <section id="error" class="error" hidden></section>
+</main>
+<div id="toast" class="toast" role="status" hidden></div>
+<script>/*SCRIPT*/</script>
+</body>
+</html>

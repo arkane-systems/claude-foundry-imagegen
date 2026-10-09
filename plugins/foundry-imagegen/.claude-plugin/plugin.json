@@ -1,0 +1,102 @@
+{
+  "name": "foundry-imagegen",
+  "displayName": "Foundry Image Generation",
+  "version": "0.1.0",
+  "description": "Generate and edit images with a GPT-image model (e.g. gpt-image-2.5-flare) deployed on Microsoft Foundry. Refines your prompt, respects the deployment's rate limit, saves full-resolution files, and shows an in-chat gallery.",
+  "author": {
+    "name": "Alistair Young",
+    "email": "avatar@arkane-systems.net"
+  },
+  "homepage": "https://github.com/arkane-systems/claude-foundry-imagegen",
+  "repository": "https://github.com/arkane-systems/claude-foundry-imagegen",
+  "license": "MIT",
+  "keywords": [
+    "image-generation",
+    "azure",
+    "microsoft-foundry",
+    "gpt-image",
+    "mcp"
+  ],
+  "icon": "./icon.png",
+  "userConfig": {
+    "endpoint": {
+      "type": "string",
+      "title": "Foundry endpoint",
+      "description": "Your Foundry / Azure OpenAI resource URL, e.g. https://<resource>.services.ai.azure.com (a project URL or full target URI also works).",
+      "required": true
+    },
+    "api_key": {
+      "type": "string",
+      "title": "API key",
+      "description": "Key for the Foundry resource (Keys and Endpoint in the portal). Stored in secure storage.",
+      "sensitive": true,
+      "required": true
+    },
+    "deployment": {
+      "type": "string",
+      "title": "Default deployment",
+      "description": "Name of the image model deployment to use by default.",
+      "default": "gpt-image-2.5-flare"
+    },
+    "extra_deployments": {
+      "type": "string",
+      "title": "Additional deployments",
+      "description": "Optional comma-separated list of other image deployments on the same resource, e.g. gpt-image-2.5-sunburst.",
+      "default": ""
+    },
+    "rpm_limit": {
+      "type": "number",
+      "title": "Requests per minute",
+      "description": "The deployment's request quota. gpt-image-2.5 GlobalStandard deployments allow 5.",
+      "default": 5,
+      "min": 1,
+      "max": 1000
+    },
+    "max_wait_seconds": {
+      "type": "number",
+      "title": "Max queue wait (seconds)",
+      "description": "How long a request may wait for a rate-limit slot before giving up with a retry time.",
+      "default": 240,
+      "min": 0,
+      "max": 3600
+    },
+    "output_dir": {
+      "type": "string",
+      "title": "Output folder",
+      "description": "Where to save images. Empty = ./generated-images in the project (or ~/Pictures/Foundry Images outside a project). Relative paths are project-relative.",
+      "default": ""
+    },
+    "api_version": {
+      "type": "string",
+      "title": "Legacy API version",
+      "description": "api-version for the deployment-scoped route, used only if the resource does not serve the v1 API.",
+      "default": "2025-04-01-preview"
+    }
+  },
+  "mcpServers": {
+    "imagegen": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--quiet",
+        "--frozen",
+        "--no-dev",
+        "--project",
+        "${CLAUDE_PLUGIN_ROOT}/server",
+        "foundry-imagegen"
+      ],
+      "env": {
+        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv",
+        "FOUNDRY_IMAGEGEN_ENDPOINT": "${user_config.endpoint}",
+        "FOUNDRY_IMAGEGEN_API_KEY": "${user_config.api_key}",
+        "FOUNDRY_IMAGEGEN_DEPLOYMENT": "${user_config.deployment}",
+        "FOUNDRY_IMAGEGEN_EXTRA_DEPLOYMENTS": "${user_config.extra_deployments}",
+        "FOUNDRY_IMAGEGEN_RPM_LIMIT": "${user_config.rpm_limit}",
+        "FOUNDRY_IMAGEGEN_MAX_WAIT_SECONDS": "${user_config.max_wait_seconds}",
+        "FOUNDRY_IMAGEGEN_OUTPUT_DIR": "${user_config.output_dir}",
+        "FOUNDRY_IMAGEGEN_API_VERSION": "${user_config.api_version}",
+        "FOUNDRY_IMAGEGEN_PROJECT_DIR": "${CLAUDE_PROJECT_DIR}"
+      }
+    }
+  }
+}
