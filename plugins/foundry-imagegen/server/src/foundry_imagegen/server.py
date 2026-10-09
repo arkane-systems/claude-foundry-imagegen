@@ -30,6 +30,7 @@ from .images import (
     validate_params,
 )
 from .ratelimit import RateLimitExceeded
+from .uploads import UploadCancelled, UploadTimedOut, broker
 
 GALLERY_URI = "ui://foundry-imagegen/gallery.html"
 
@@ -42,7 +43,9 @@ Before calling generate_image or edit_image, follow the `imagine` skill (if avai
 user's idea into a structured prompt and pick parameters. The deployment allows only a few requests
 per minute (often 2–5; check_config shows the limit): ask for variations with `n` in one call instead
 of repeated calls; calls queue automatically when the limit is reached. Results are saved to disk; the tool result lists the
-file paths and includes downscaled previews for you to review. Use check_config to diagnose setup."""
+file paths and includes downscaled previews for you to review. Use check_config to diagnose setup.
+Images attached to the chat live in your sandbox, which these tools can't read: call upload_images so
+the user can hand the file to the server, or ask for its path on their computer."""
 
 _state: dict[str, Any] = {}
 
@@ -70,6 +73,11 @@ def _output_dir(override: str | None, settings: Settings) -> Path:
     if not path.is_absolute():
         path = (settings.project_dir or settings.output_dir) / path
     return path
+
+
+def _input_record(path: Path) -> str | dict[str, Any]:
+    """Uploaded inputs are recorded by origin (name, size, hash) since their staged copy is temporary."""
+    return broker().provenance(path) or str(path)
 
 
 def _known_output_dirs(settings: Settings) -> list[Path]:
@@ -150,8 +158,8 @@ async def _run(
         "prompt": prompt,
         "deployment": dep,
         "params": params.as_request(),
-        "inputs": [str(i.path) for i in inputs],
-        "mask": str(mask_input.path) if mask_input else None,
+        "inputs": [_input_record(i.path) for i in inputs],
+        "mask": _input_record(mask_input.path) if mask_input else None,
         "usage": response.usage,
         "duration_s": round(elapsed, 1),
     }
@@ -356,6 +364,83 @@ async def copy_image_to_clipboard(
         return _error(str(exc))
     what = "Image" if content == "image" else "Path"
     return CallToolResult(content=[TextContent(type="text", text=f"{what} copied to the clipboard.")])
+
+
+@apps.tool(
+    resource_uri=GALLERY_URI,
+    description=(
+        "Let the user hand you image files from their computer, for edit_image. Use this when the user "
+        "attached an image to the chat (attachments live in your sandbox, which the image server can't "
+        "read) or wants to use a local image whose path they don't know. Shows an upload panel where the "
+        "user drops, picks, or pastes images, waits until they do (or cancel), and returns paths that "
+        "edit_image can use. Tell the user to add the image(s) in the panel."
+    ),
+    annotations=ToolAnnotations(title="Upload images", read_only_hint=True),
+)
+async def upload_images(
+    ctx: Context,
+    purpose: Annotated[
+        str | None, Field(description="Short note shown in the panel, e.g. 'the photo to restyle'.")
+    ] = None,
+    max_files: Annotated[int, Field(ge=1, le=16, description="Most images to accept (1–16).")] = 1,
+    timeout_seconds: Annotated[int, Field(ge=30, le=900, description="How long to wait for the user.")] = 300,
+) -> CallToolResult:
+    uploads = broker()
+    images = uploads.take_orphans()
+    if images is None:
+        pending = uploads.open_request(str(ctx.request_id), max_files)
+        ticks = {"n": 0}
+
+        async def on_tick(remaining: float) -> None:
+            ticks["n"] += 1
+            await ctx.report_progress(ticks["n"], None, f"Waiting for the image upload ({remaining:.0f} s left)")
+
+        try:
+            images = await uploads.wait(pending, timeout_seconds, on_tick)
+        except UploadCancelled:
+            return CallToolResult(
+                content=[TextContent(type="text", text="The user cancelled the upload. Ask how they'd like to proceed.")],
+                structured_content={"kind": "upload", "status": "cancelled", "images": []},
+            )
+        except UploadTimedOut:
+            return _error(
+                f"No image was uploaded within {timeout_seconds} s. Ask the user to try again, or for the "
+                "image's path on their computer."
+            )
+    lines = [f"The user uploaded {len(images)} image(s); use these paths with edit_image:"]
+    lines += [f"- {img.path} (originally {img.name!r}, {img.width}x{img.height})" for img in images]
+    lines.append("These are temporary copies; they are removed when the server exits.")
+    return CallToolResult(
+        content=[TextContent(type="text", text="\n".join(lines))],
+        structured_content={"kind": "upload", "status": "received", "images": [i.summary() for i in images]},
+    )
+
+
+@apps.tool(
+    resource_uri=GALLERY_URI,
+    visibility=["app"],
+    description="Receive images from the upload panel and hand them to the waiting upload_images call.",
+)
+def stage_upload(
+    files: Annotated[list[dict[str, Any]], Field(description="[{name, data (base64), original_path?}]")],
+    request_id: str | None = None,
+) -> CallToolResult:
+    try:
+        images = broker().stage(files)
+    except ValidationError as exc:
+        return _error(str(exc))
+    delivered = broker().deliver(request_id, images)
+    note = "Sent to Claude." if delivered else "Received; Claude will pick it up on the next upload request."
+    return CallToolResult(
+        content=[TextContent(type="text", text=note)],
+        structured_content={"delivered": delivered, "images": [i.summary() for i in images]},
+    )
+
+
+@apps.tool(resource_uri=GALLERY_URI, visibility=["app"], description="Cancel the waiting upload_images call.")
+def cancel_upload(request_id: str | None = None) -> CallToolResult:
+    cancelled = broker().cancel(request_id)
+    return CallToolResult(content=[TextContent(type="text", text="Cancelled." if cancelled else "Nothing to cancel.")])
 
 apps.add_html_resource(
     GALLERY_URI,

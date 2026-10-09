@@ -15,6 +15,7 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | `imagine` skill (`/foundry-imagegen:imagine <idea>`) | Turns a rough idea into a structured prompt, asks up to 3 clarifying questions, picks size, quality, and format, reviews the result, and iterates |
 | `generate_image` tool | Text to image: any size up to 4K, quality `low`…`max`, 1–10 variations, PNG/JPEG, transparent backgrounds |
 | `edit_image` tool | Edits an image, or composes from up to 16 reference images, with an optional mask |
+| `upload_images` tool | Opens an upload panel in Claude Desktop so you can hand Claude images from your computer for editing |
 | `check_config` tool | Checks your endpoint, key, and deployments, and shows the rate-limit state |
 | Gallery widget | In Claude Desktop, shows results with **Download**, **Copy image**, **Show in folder**, and **Copy path**, available as buttons and on right-click |
 | Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
@@ -121,6 +122,23 @@ Just ask:
 Claude shows you the final prompt and settings before generating. It reviews the result, offers
 targeted follow-up edits, and links to the saved files.
 
+### Editing your own images
+
+The image server runs on your computer, so the images you want to edit have to be reachable there:
+
+- **Claude Code:** give a path, either inside the project or anywhere on your computer.
+- **Claude Desktop (Chat and Cowork):** an image you attach to the message goes into Claude's own
+  sandbox, which the image server can't read. Claude will open an **upload panel** in the chat
+  instead. Drop the image there, choose it with the file picker, or paste it with Ctrl+V (⌘V), then
+  click **Send to Claude**. **Cancel** stops the request. You can also give Claude the image's path
+  on your computer, for example `C:\Users\you\Pictures\photo.jpg` or a network path.
+
+Uploaded copies are temporary: they're kept in the plugin's cache folder only while the server is
+running, and leftovers are removed after 24 hours. `index.jsonl` records an uploaded image by its
+original file name, size, and SHA-256 hash, so you can still tell which file an edit started from.
+Browsers don't reveal a dropped file's location to the page, so the original path is recorded
+only when you give Claude the path yourself.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -130,6 +148,7 @@ targeted follow-up edits, and links to the saved files.
 | "Deployment … was not found" | Use the deployment name from the Foundry portal, not the model name, if they differ |
 | "Rate limit: the next request slot opens at …" | The queue wait would exceed `max_wait_seconds`. Wait, raise the setting, or [request more quota](https://learn.microsoft.com/azure/foundry/openai/quotas-limits) |
 | "The service's safety system blocked …" | The prompt or the output was filtered. Rephrase |
+| "… is in Claude's sandbox …" | You attached the image to the chat. Use the upload panel Claude opens, or give the path on your computer |
 | Plugin tools missing in Claude Code | Check that `uv` is on `PATH`, then run `/mcp` to see the server status |
 
 ## Development

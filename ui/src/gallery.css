@@ -66,3 +66,14 @@ button.action[disabled] { opacity: 0.6; cursor: progress; }
 .menu button { font: inherit; font-size: 13px; text-align: left; padding: 6px 10px; border: 0; border-radius: 5px;
   background: transparent; color: var(--text); cursor: pointer; }
 .menu button:hover, .menu button:focus-visible { background: var(--surface); outline: none; }
+.dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 22px 16px; text-align: center; background: var(--surface); }
+.dropzone.over, .dropzone:focus-visible { border-color: var(--accent); outline: none; }
+.drop-main { margin: 0 0 4px; font-weight: 600; }
+.linkish { font: inherit; padding: 0; border: 0; background: none; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.picked { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.picked figure { width: 112px; }
+.picked img { display: block; width: 100%; height: 80px; object-fit: cover; }
+.picked figcaption { padding: 4px 6px; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.upload-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+button.action.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.upload.locked .dropzone { opacity: 0.6; pointer-events: none; }

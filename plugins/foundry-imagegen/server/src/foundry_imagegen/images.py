@@ -6,6 +6,7 @@ import base64
 import io
 import json
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -139,6 +140,25 @@ class InputImage:
     height: int
 
 
+# Where Claude's own sandbox keeps chat attachments and scratch files. The image server runs on the
+# user's computer, so these paths never exist for it.
+SANDBOX_PREFIXES = ("/mnt/user-data/", "/mnt/data/", "/mnt/outputs/", "/home/claude/")
+
+SANDBOX_HINT = (
+    "{raw!r} is in Claude's sandbox (where files attached to a chat are stored), so the image server on "
+    "your computer can't read it. Either call upload_images so the user can drop or paste the image into "
+    "the upload panel, or ask the user for the image's path on their computer."
+)
+
+
+def looks_like_sandbox_path(raw: str, platform: str = sys.platform) -> bool:
+    normalized = raw.strip().replace("\\", "/")
+    if normalized.startswith(SANDBOX_PREFIXES):
+        return True
+    # A POSIX absolute path can't be a local file on Windows.
+    return platform == "win32" and normalized.startswith("/") and not normalized.startswith("//")
+
+
 def resolve_input_path(raw: str, bases: list[Path]) -> Path:
     path = Path(raw).expanduser()
     if path.is_absolute():
@@ -148,6 +168,8 @@ def resolve_input_path(raw: str, bases: list[Path]) -> Path:
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()
+    if looks_like_sandbox_path(raw):
+        raise ValidationError(SANDBOX_HINT.format(raw=raw))
     tried = ", ".join(str(c) for c in candidates)
     raise ValidationError(f"Image file not found: {raw!r} (looked in: {tried}).")
 

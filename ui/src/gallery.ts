@@ -5,6 +5,7 @@ import {
   applyHostStyleVariables,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps/app-with-deps";
+import { UploadPanel } from "./upload";
 
 interface ImageInfo {
   path: string;
@@ -28,7 +29,7 @@ type ContentBlock = { type: string; text?: string; data?: string; mimeType?: str
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.2" }, { availableDisplayModes: ["inline", "fullscreen"] });
+const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.3" }, { availableDisplayModes: ["inline", "fullscreen"] });
 
 function applyContext(ctx: McpUiHostContext | undefined): void {
   if (!ctx) return;
@@ -297,18 +298,37 @@ function render(data: ResultData, previews: ContentBlock[]): void {
 
 app.onhostcontextchanged = (ctx) => applyContext(ctx as McpUiHostContext);
 
+const uploadPanel = new UploadPanel(app, toast);
+let uploadMode = false;
+
 app.ontoolinput = (params) => {
   const args = (params.arguments ?? {}) as { prompt?: string; n?: number; size?: string; quality?: string };
+  // generate_image and edit_image always carry a prompt; upload_images never does.
+  if (args.prompt === undefined) {
+    uploadMode = true;
+    uploadPanel.show(args as { purpose?: string; max_files?: number });
+    return;
+  }
   const what = [args.n && args.n > 1 ? `${args.n} images` : "1 image", args.size, args.quality]
     .filter((x) => x && x !== "auto")
     .join(" · ");
   showStatus(`Generating ${what}…`, args.prompt ?? "");
 };
 
-app.ontoolcancelled = () => showError("The request was cancelled.");
+app.ontoolcancelled = () => {
+  if (uploadMode) uploadPanel.finish("cancelled", "");
+  else showError("The request was cancelled.");
+};
 
 app.ontoolresult = (result) => {
   const content = (result.content ?? []) as ContentBlock[];
+  const upload = result.structuredContent as { kind?: string; status?: string; images?: { name: string }[] } | undefined;
+  if (uploadMode || upload?.kind === "upload") {
+    if (result.isError) uploadPanel.finish("error", textOf(content) || "The upload failed.");
+    else if (upload?.status === "cancelled") uploadPanel.finish("cancelled", "");
+    else uploadPanel.finish("received", (upload?.images ?? []).map((i) => i.name).join(", ") || "the image");
+    return;
+  }
   const data = result.structuredContent as ResultData | undefined;
   if (result.isError || !data?.images?.length) {
     showError(textOf(content) || "The image request failed.");

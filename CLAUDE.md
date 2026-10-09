@@ -14,11 +14,16 @@ extension (`.mcpb`).
     - `client.py`: Foundry HTTP client. Tries the v1 route first and falls back to the legacy route; handles retries, 429 cooldowns, and error mapping.
     - `ratelimit.py`: cross-process RPM limiter (file lock plus JSON state in the user state dir).
     - `images.py`: parameter and input validation, saving, previews, and `index.jsonl`.
-    - `server.py`: tools, MCP Apps registration, and the app-only `fetch_image`/`reveal_image`/`copy_image_to_clipboard` tools.
+    - `server.py`: tools, MCP Apps registration, and the app-only `fetch_image`/`reveal_image`/`copy_image_to_clipboard`/
+      `stage_upload`/`cancel_upload` tools.
+    - `uploads.py`: `upload_images` support. Chat attachments live in Claude's sandbox, unreadable by the server, so the
+      widget sends files straight to the server, which stages them in the user cache dir (deleted at exit, 24 h TTL)
+      and records name/size/SHA-256 in `index.jsonl` instead of the temporary path.
     - `clipboard.py`: OS clipboard from the server process (PowerShell, osascript/pbcopy, wl-copy/xclip). The gallery's
       sandboxed frame usually can't write to the clipboard itself, so its Copy actions go through this.
     - `ui/gallery.html`: **build output** of `ui/`. It is committed so users never need Node.
-- `ui/`: source for the gallery MCP App (TypeScript, `@modelcontextprotocol/ext-apps`, esbuild).
+- `ui/`: source for the gallery MCP App (TypeScript, `@modelcontextprotocol/ext-apps`, esbuild). `upload.ts` is the
+  upload panel shown for `upload_images`.
 - `mcpb/`: the desktop extension manifest and icon. `scripts/build-mcpb.sh` stages the server and packs it.
 - `scripts/bump-version.py`: sets or checks the version across pyproject, `__init__`, plugin.json, the mcpb manifest, and the UI.
 

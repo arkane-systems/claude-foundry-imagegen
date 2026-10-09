@@ -22,6 +22,23 @@
     </header>
     <div id="grid" class="grid"></div>
   </section>
+  <section id="upload" class="upload" hidden>
+    <header class="meta">
+      <p id="upload-title" class="prompt">Add an image for Claude</p>
+      <p id="upload-purpose" class="details"></p>
+    </header>
+    <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-describedby="drop-help">
+      <p class="drop-main">Drop an image here</p>
+      <p id="drop-help" class="details">or <button type="button" id="choose" class="linkish">choose a file</button>, or paste one with Ctrl+V (⌘V). PNG, JPEG, or WebP, under 50 MB.</p>
+      <input id="file-input" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+    <div id="picked" class="picked"></div>
+    <div class="upload-actions">
+      <button type="button" id="send" class="action primary" disabled>Send to Claude</button>
+      <button type="button" id="cancel" class="action">Cancel</button>
+      <span id="upload-status" class="details" aria-live="polite"></span>
+    </div>
+  </section>
   <section id="error" class="error" hidden></section>
 </main>
 <div id="toast" class="toast" role="status" hidden></div>
