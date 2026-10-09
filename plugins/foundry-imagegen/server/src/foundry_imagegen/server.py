@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
 import subprocess
 import sys
 import time
@@ -12,14 +11,14 @@ from importlib import resources
 from pathlib import Path
 from typing import Annotated, Any
 
-from mcp.server.apps import Apps
+from mcp.server.apps import Apps, ResourcePermissions
 from mcp.server.mcpserver import Context, MCPServer
 from mcp_types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 from pydantic import Field
 
 from . import __version__
 from .client import FoundryError, FoundryImageClient, ImageResponse
-from .config import ConfigError, Settings, config_file_path, load_settings
+from .config import ConfigError, Settings, config_file_path, expand_path, load_settings
 from .images import (
     ValidationError,
     append_index,
@@ -66,7 +65,7 @@ def _error(message: str) -> CallToolResult:
 def _output_dir(override: str | None, settings: Settings) -> Path:
     if not override:
         return settings.output_dir
-    path = Path(os.path.expandvars(override)).expanduser()
+    path = expand_path(override)
     if not path.is_absolute():
         path = (settings.project_dir or settings.output_dir) / path
     return path
@@ -342,6 +341,8 @@ apps.add_html_resource(
     resources.files("foundry_imagegen").joinpath("ui/gallery.html").read_text(encoding="utf-8"),
     title="Foundry image gallery",
     prefers_border=True,
+    # Copy path / Copy image use the async Clipboard API, which a sandboxed frame needs permission for.
+    permissions=ResourcePermissions(clipboard_write={}),
 )
 
 mcp = MCPServer(

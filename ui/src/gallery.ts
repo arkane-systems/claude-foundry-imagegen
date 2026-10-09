@@ -28,7 +28,7 @@ type ContentBlock = { type: string; text?: string; data?: string; mimeType?: str
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.0" }, { availableDisplayModes: ["inline", "fullscreen"] });
+const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.1" }, { availableDisplayModes: ["inline", "fullscreen"] });
 
 function applyContext(ctx: McpUiHostContext | undefined): void {
   if (!ctx) return;
@@ -87,14 +87,135 @@ async function reveal(info: ImageInfo): Promise<void> {
   if (result.isError) toast(textOf(result.content as ContentBlock[]) || "Could not open the folder");
 }
 
-async function copyPath(info: ImageInfo): Promise<void> {
+/** Copy text: async Clipboard API, then execCommand, then an inline field the user can copy from. */
+async function copyText(text: string, anchor: HTMLElement): Promise<void> {
   try {
-    await navigator.clipboard.writeText(info.path);
+    await navigator.clipboard.writeText(text);
     toast("Path copied");
+    return;
   } catch {
-    window.prompt("Copy the file path:", info.path);
+    // Clipboard API not permitted in this frame; fall through.
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+  area.remove();
+  if (copied) {
+    toast("Path copied");
+    return;
+  }
+  showManualCopy(text, anchor);
+}
+
+function showManualCopy(text: string, anchor: HTMLElement): void {
+  const figure = anchor.closest("figure") ?? $("result");
+  figure.querySelector(".manual-copy")?.remove();
+  const field = document.createElement("input");
+  field.className = "manual-copy";
+  field.readOnly = true;
+  field.value = text;
+  field.setAttribute("aria-label", "File path — press Ctrl+C to copy");
+  figure.append(field);
+  field.focus();
+  field.select();
+  toast("Press Ctrl+C (⌘C) to copy the selected path");
+}
+
+async function pngBlob(info: ImageInfo): Promise<Blob> {
+  const result = await app.callServerTool({ name: "fetch_image", arguments: { path: info.path } });
+  const data = (result.structuredContent as { data?: string } | undefined)?.data;
+  if (result.isError || !data) throw new Error(textOf(result.content as ContentBlock[]) || "The file could not be read.");
+  const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: info.mime });
+  if (info.mime === "image/png") return blob;
+  // The clipboard reliably accepts only PNG; re-encode JPEG/WebP through a canvas.
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((png) => (png ? resolve(png) : reject(new Error("PNG conversion failed"))), "image/png"),
+  );
+}
+
+async function copyImage(info: ImageInfo): Promise<void> {
+  if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+    toast("This host doesn't allow copying images — use Download instead");
+    return;
+  }
+  try {
+    // Pass the blob as a promise so the write starts inside the click's user activation.
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob(info) })]);
+    toast("Image copied");
+  } catch (err) {
+    const denied = (err as Error).name === "NotAllowedError";
+    toast(denied ? "This host doesn't allow copying images — use Download instead" : `Copy failed: ${(err as Error).message}`);
   }
 }
+
+type Action = { label: string; run: (anchor: HTMLButtonElement) => void };
+
+function actionsFor(info: ImageInfo, canDownload: boolean): Action[] {
+  const actions: Action[] = [];
+  if (canDownload) actions.push({ label: "Download", run: (btn) => void download(info, btn) });
+  actions.push({ label: "Copy image", run: () => void copyImage(info) });
+  actions.push({ label: "Show in folder", run: () => void reveal(info) });
+  actions.push({ label: "Copy path", run: (btn) => void copyText(info.path, btn) });
+  return actions;
+}
+
+let openMenu: HTMLElement | null = null;
+
+function closeMenu(): void {
+  openMenu?.remove();
+  openMenu = null;
+}
+
+/** Our own context menu: the host's native image menu cannot copy images out of the sandboxed frame. */
+function showMenu(event: MouseEvent, actions: Action[], figure: HTMLElement): void {
+  event.preventDefault();
+  closeMenu();
+  const menu = document.createElement("div");
+  menu.className = "menu";
+  menu.setAttribute("role", "menu");
+  for (const action of actions) {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.setAttribute("role", "menuitem");
+    item.textContent = action.label;
+    item.addEventListener("click", () => {
+      closeMenu();
+      action.run(figure.querySelector("button.action") as HTMLButtonElement);
+    });
+    menu.append(item);
+  }
+  document.body.append(menu);
+  const { innerWidth, innerHeight } = window;
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.min(event.clientX, innerWidth - rect.width - 4)}px`;
+  menu.style.top = `${Math.min(event.clientY, innerHeight - rect.height - 4)}px`;
+  (menu.firstElementChild as HTMLElement | null)?.focus();
+  openMenu = menu;
+}
+
+document.addEventListener("click", (e) => {
+  if (openMenu && !openMenu.contains(e.target as Node)) closeMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMenu();
+});
+window.addEventListener("blur", closeMenu);
 
 function button(label: string, onClick: (btn: HTMLButtonElement) => void): HTMLButtonElement {
   const btn = document.createElement("button");
@@ -144,9 +265,9 @@ function render(data: ResultData, previews: ContentBlock[]): void {
       name.className = "name";
       name.textContent = `${info.file_name} — ${info.width}×${info.height}, ${formatBytes(info.bytes)}`;
       caption.append(name);
-      if (canDownload) caption.append(button("Download", (btn) => void download(info, btn)));
-      caption.append(button("Show in folder", () => void reveal(info)));
-      caption.append(button("Copy path", () => void copyPath(info)));
+      const actions = actionsFor(info, canDownload);
+      caption.append(...actions.map((a) => button(a.label, a.run)));
+      frame.addEventListener("contextmenu", (e) => showMenu(e, actions, figure));
       figure.append(frame, caption);
       return figure;
     }),

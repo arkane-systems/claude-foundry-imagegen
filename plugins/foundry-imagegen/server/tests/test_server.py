@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -69,3 +70,22 @@ async def test_check_config_without_probe():
         result = await client.call_tool("check_config", {"probe": False})
     text = result.content[0].text
     assert "secr…3456" in text and "secret-key-123456" not in text
+
+
+@respx.mock
+async def test_per_call_output_dir_expands_variables(settings, tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    respx.post(f"{V1}/generations").mock(return_value=ok())
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("generate_image", {"prompt": "x", "output_dir": "${HOME}/custom"})
+    assert not result.is_error, result.content[0].text
+    assert result.structured_content["output_dir"] == str(tmp_path / "custom")
+
+
+async def test_gallery_requests_clipboard_permission():
+    async with Client(server.mcp) as client:
+        resources = await client.list_resources()
+        gallery = next(r for r in resources.resources if r.uri == server.GALLERY_URI)
+        content = await client.read_resource(gallery.uri)
+    meta = content.contents[0].meta or gallery.meta
+    assert meta["ui"]["permissions"] == {"clipboardWrite": {}}

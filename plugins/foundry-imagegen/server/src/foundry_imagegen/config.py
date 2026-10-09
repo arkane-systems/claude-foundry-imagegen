@@ -24,11 +24,23 @@ DEFAULT_DEPLOYMENT = "gpt-image-2.5-flare"
 DEFAULT_API_VERSION = "2025-04-01-preview"
 DEFAULT_RPM = 5
 DEFAULT_MAX_WAIT = 240
-DEFAULT_DESKTOP_DIR = Path.home() / "Pictures" / "Foundry Images"
+DEFAULT_DESKTOP_DIR = Path(platformdirs.user_pictures_dir()) / "Foundry Images"
 PROJECT_SUBDIR = "generated-images"
 
 # Unsubstituted placeholders that a host may pass through verbatim when a value is unset.
 _PLACEHOLDER = re.compile(r"^\$\{[^}]*\}$")
+_VARIABLE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+# Folder variables from the MCPB spec (and a few extras). Hosts may pass them through unexpanded,
+# and Windows has no HOME environment variable, so the server resolves them itself.
+_FOLDER_VARIABLES = {
+    "HOME": lambda: str(Path.home()),
+    "USERPROFILE": lambda: str(Path.home()),
+    "DESKTOP": lambda: platformdirs.user_desktop_dir(),
+    "DOCUMENTS": lambda: platformdirs.user_documents_dir(),
+    "PICTURES": lambda: platformdirs.user_pictures_dir(),
+    "DOWNLOADS": lambda: platformdirs.user_downloads_dir(),
+}
 
 
 class ConfigError(Exception):
@@ -123,11 +135,27 @@ def _read_config_file(path: Path) -> dict[str, object]:
     return data
 
 
+def expand_path(raw: str) -> Path:
+    """Expand ~, ${HOME}/${DESKTOP}/${DOCUMENTS}/${PICTURES}/${DOWNLOADS}, and environment variables."""
+
+    def folder(match: re.Match[str]) -> str:
+        resolver = _FOLDER_VARIABLES.get(match.group(1).upper())
+        return resolver() if resolver else match.group(0)
+
+    value = os.path.expandvars(_VARIABLE.sub(folder, raw.strip()))
+    if leftover := _VARIABLE.search(value):
+        raise ConfigError(
+            f"The path {raw!r} contains {leftover.group(0)}, which is not a known folder or environment "
+            f"variable. Use an absolute path, or one of ${{HOME}}, ${{DOCUMENTS}}, ${{PICTURES}}, ${{DESKTOP}}."
+        )
+    return Path(value).expanduser()
+
+
 def _resolve_output_dir(configured: str | None, project_dir: Path | None) -> Path:
     if configured:
-        path = Path(os.path.expandvars(configured)).expanduser()
+        path = expand_path(configured)
         if not path.is_absolute():
-            path = (project_dir or Path.home()) / path
+            path = (project_dir or DEFAULT_DESKTOP_DIR.parent) / path
         return path
     if project_dir is not None:
         return project_dir / PROJECT_SUBDIR

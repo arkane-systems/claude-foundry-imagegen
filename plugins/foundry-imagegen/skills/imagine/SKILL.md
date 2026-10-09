@@ -104,6 +104,6 @@ path). Follow [references/editing.md](references/editing.md):
   logged in `index.jsonl` beside them with the prompt and settings.
 - In the Claude Code desktop app, send the image with `SendUserFile` when that tool is available.
 - In Claude Desktop (Chat or Cowork), the gallery widget under the tool call has Download,
-  Show in folder, and Copy path buttons.
+  Copy image, Show in folder, and Copy path (as buttons and on right-click).
 - Offer a sensible next step (variations, a different aspect ratio, a transparent version, a
   higher-quality final).

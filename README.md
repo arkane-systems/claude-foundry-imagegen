@@ -3,7 +3,7 @@
 Give Claude image generation through your own Microsoft Foundry deployment of a GPT-image model
 (for example `gpt-image-2.5-flare`). Claude refines your idea into a model-ready prompt, asking a
 few questions when it matters. It then generates or edits the image, saves the full-resolution
-file, and shows it to you. In Claude Desktop the image appears in a gallery with download buttons.
+file, and shows it to you. In Claude Desktop the image appears in a gallery with download and copy buttons.
 
 It works in **Claude Code** (terminal and the desktop app's Code tab) and in **Claude Desktop**
 (Chat and Cowork).
@@ -16,7 +16,7 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | `generate_image` tool | Text to image: any size up to 4K, quality `low`…`max`, 1–10 variations, PNG/JPEG, transparent backgrounds |
 | `edit_image` tool | Edits an image, or composes from up to 16 reference images, with an optional mask |
 | `check_config` tool | Checks your endpoint, key, and deployments, and shows the rate-limit state |
-| Gallery widget | In Claude Desktop, shows results with **Download**, **Show in folder**, and **Copy path** buttons |
+| Gallery widget | In Claude Desktop, shows results with **Download**, **Copy image**, **Show in folder**, and **Copy path**, available as buttons and on right-click |
 | Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
 
 Images are saved to `./generated-images/` in a Claude Code project. Outside a project they go to

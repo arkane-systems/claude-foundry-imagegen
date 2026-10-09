@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "foundry-imagegen",
   "display_name": "Foundry Image Generation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Generate and edit images with a GPT-image model deployed on Microsoft Foundry, with an in-chat gallery.",
   "long_description": "Gives Claude image generation and editing through your own Microsoft Foundry deployment of a GPT-image model (such as gpt-image-2.5-flare). Supports reference images, masks, sizes up to 4K, quality levels, transparent backgrounds, and multiple variations per request. Requests are queued to respect the deployment's requests-per-minute quota. Images are saved to a folder you choose and shown in a gallery with download buttons. Pair it with the foundry-imagegen plugin for the `imagine` prompting skill.",
   "author": {
