@@ -114,9 +114,9 @@ def test_output_dir_expands_mcpb_folder_variables_without_home_env(tmp_path, mon
     monkeypatch.delenv("HOME", raising=False)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     s = load_settings(
-        base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR="${HOME}/Pictures/Foundry Images"), config_path=tmp_path / "none.toml"
+        base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR="${HOME}/Art/Foundry Images"), config_path=tmp_path / "none.toml"
     )
-    assert s.output_dir == tmp_path / "Pictures" / "Foundry Images"
+    assert s.output_dir == tmp_path / "Art" / "Foundry Images"
     assert "${" not in str(s.output_dir)
 
 
@@ -133,3 +133,21 @@ def test_output_dir_expands_documents_and_tilde(tmp_path, monkeypatch):
 def test_output_dir_rejects_unknown_variable(tmp_path):
     with pytest.raises(ConfigError, match=r"\$\{NOPE_NOT_SET\}"):
         load_settings(base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR="${NOPE_NOT_SET}/x"), config_path=tmp_path / "none.toml")
+
+
+@pytest.mark.parametrize(
+    "legacy", ["${HOME}/Pictures/Foundry Images", "${HOME}\\Pictures\\Foundry Images\\", " ${home}/pictures/foundry images "]
+)
+def test_legacy_mcpb_default_uses_real_pictures_folder(tmp_path, legacy):
+    # 0.1.0/0.1.1 shipped "${HOME}/Pictures/Foundry Images", which ignores a redirected Pictures folder.
+    s = load_settings(base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR=legacy), config_path=tmp_path / "none.toml")
+    assert s.output_dir == DEFAULT_DESKTOP_DIR
+
+
+def test_pictures_variable_follows_platform_pictures_dir(tmp_path, monkeypatch):
+    import platformdirs
+
+    share = tmp_path / "share" / "My Pictures"
+    monkeypatch.setattr(platformdirs, "user_pictures_dir", lambda: str(share))
+    s = load_settings(base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR="${PICTURES}/Foundry Images"), config_path=tmp_path / "none.toml")
+    assert s.output_dir == share / "Foundry Images"

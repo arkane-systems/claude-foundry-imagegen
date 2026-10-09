@@ -63,7 +63,7 @@
     "output_dir": {
       "type": "string",
       "title": "Output folder",
-      "description": "Where to save images. Empty = ./generated-images in the project (or ~/Pictures/Foundry Images outside a project). Relative paths are project-relative.",
+      "description": "Where to save images. Empty = ./generated-images in the project (or Foundry Images in your Pictures folder outside a project). Relative paths are project-relative. ${HOME}, ${PICTURES}, ${DOCUMENTS}, ${DESKTOP}, ${DOWNLOADS} and ~ are expanded.",
       "default": ""
     },
     "api_version": {

@@ -86,7 +86,7 @@
       "type": "directory",
       "title": "Output folder",
       "description": "Where generated images are saved.",
-      "default": "${HOME}/Pictures/Foundry Images"
+      "default": "${PICTURES}/Foundry Images"
     },
     "api_version": {
       "type": "string",

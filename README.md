@@ -20,8 +20,8 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
 
 Images are saved to `./generated-images/` in a Claude Code project. Outside a project they go to
-`~/Pictures/Foundry Images`. Each folder also gets an `index.jsonl` that records the prompt and
-settings for every image.
+`Foundry Images` in your Pictures folder, even when Pictures is redirected to OneDrive or a network
+share. Each folder also gets an `index.jsonl` that records the prompt and settings for every image.
 
 ## Where each part runs
 
@@ -89,7 +89,7 @@ deployment = "gpt-image-2.5-flare"
 extra_deployments = "gpt-image-2.5-sunburst"   # optional
 rpm_limit = 5
 max_wait_seconds = 240
-# output_dir = "~/Pictures/Foundry Images"
+# output_dir = "${PICTURES}/Foundry Images"   # also ${HOME}, ${DOCUMENTS}, ${DESKTOP}, ${DOWNLOADS}, ~
 ```
 
 Run `check_config`, or ask Claude to "check the image generation setup", to see which source
@@ -105,7 +105,7 @@ each setting came from. The key is masked in that output.
 | `extra_deployments` | – | Comma-separated. Claude can choose these per request, for example Sunburst for final renders |
 | `rpm_limit` | `5` | Your deployment's requests-per-minute quota. If the service reports a lower limit (`x-ratelimit-limit-requests`), that limit is used instead. `check_config` shows both |
 | `max_wait_seconds` | `240` | Longest a request waits in the queue before it returns a "retry at" time instead |
-| `output_dir` | auto | Empty means `./generated-images` in a project, otherwise `~/Pictures/Foundry Images` |
+| `output_dir` | auto | Empty means `./generated-images` in a project, otherwise `Foundry Images` in your Pictures folder, following any OneDrive or network-share redirection. `${PICTURES}`, `${DOCUMENTS}`, `${DESKTOP}`, `${DOWNLOADS}`, `${HOME}` and `~` are expanded |
 | `api_version` | `2025-04-01-preview` | Used only if your resource doesn't serve the GA `/openai/v1` API |
 
 ## Usage

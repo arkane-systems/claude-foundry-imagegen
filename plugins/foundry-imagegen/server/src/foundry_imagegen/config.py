@@ -151,7 +151,18 @@ def expand_path(raw: str) -> Path:
     return Path(value).expanduser()
 
 
+# The Desktop Extension's original default. It hard-codes "Pictures under the profile folder", which
+# is wrong when Pictures is redirected (OneDrive, a network share), and installs keep the saved value.
+_LEGACY_DEFAULT_OUTPUT = "${HOME}/Pictures/Foundry Images"
+
+
+def _is_legacy_default(value: str) -> bool:
+    return value.strip().replace("\\", "/").rstrip("/").lower() == _LEGACY_DEFAULT_OUTPUT.lower()
+
+
 def _resolve_output_dir(configured: str | None, project_dir: Path | None) -> Path:
+    if configured and _is_legacy_default(configured):
+        configured = None
     if configured:
         path = expand_path(configured)
         if not path.is_absolute():
