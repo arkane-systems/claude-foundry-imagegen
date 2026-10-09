@@ -1,0 +1,19 @@
+{
+  "name": "arkane-systems",
+  "owner": {
+    "name": "Alistair Young",
+    "email": "avatar@arkane-systems.net"
+  },
+  "metadata": {
+    "description": "Claude plugins from Arkane Systems."
+  },
+  "plugins": [
+    {
+      "name": "foundry-imagegen",
+      "source": "./plugins/foundry-imagegen",
+      "description": "Image generation and editing with a GPT-image model deployed on Microsoft Foundry, with prompt refinement and an in-chat gallery.",
+      "category": "productivity",
+      "keywords": ["image-generation", "azure", "microsoft-foundry", "gpt-image", "mcp"]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+:root {
+  --bg: var(--color-background-primary, #ffffff);
+  --surface: var(--color-background-secondary, #f4f4f2);
+  --text: var(--color-text-primary, #1f1e1d);
+  --muted: var(--color-text-secondary, #6b6a68);
+  --border: var(--color-border-primary, #e2e0dc);
+  --accent: var(--color-text-info, #2f6fdf);
+  --danger: var(--color-text-danger, #b42318);
+  --radius: var(--border-radius-md, 10px);
+  --font: var(--font-sans, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: var(--color-background-primary, #1f1e1d);
+    --surface: var(--color-background-secondary, #2a2927);
+    --text: var(--color-text-primary, #f2f1ee);
+    --muted: var(--color-text-secondary, #a8a6a1);
+    --border: var(--color-border-primary, #3a3936);
+    --accent: var(--color-text-info, #7aa7ff);
+    --danger: var(--color-text-danger, #ff8a80);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: var(--color-background-primary, #1f1e1d);
+  --surface: var(--color-background-secondary, #2a2927);
+  --text: var(--color-text-primary, #f2f1ee);
+  --muted: var(--color-text-secondary, #a8a6a1);
+  --border: var(--color-border-primary, #3a3936);
+  --accent: var(--color-text-info, #7aa7ff);
+  --danger: var(--color-text-danger, #ff8a80);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 var(--font); }
+main { padding: 12px; }
+.status { display: flex; gap: 12px; align-items: center; padding: 16px; background: var(--surface); border-radius: var(--radius); }
+.status-title { font-weight: 600; }
+.status-detail { color: var(--muted); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.spinner { width: 22px; height: 22px; flex: none; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.meta { margin-bottom: 10px; }
+.prompt { margin: 0 0 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.details { margin: 0; color: var(--muted); font-size: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.grid.single { grid-template-columns: 1fr; }
+figure { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.frame { display: block; width: 100%; padding: 0; border: 0; background:
+  repeating-conic-gradient(var(--border) 0 25%, transparent 0 50%) 0 0 / 16px 16px; cursor: zoom-in; }
+.frame img { display: block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; }
+figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; }
+.name { flex: 1 1 100%; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+button.action { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--text); cursor: pointer; }
+button.action:hover { border-color: var(--accent); }
+button.action:focus-visible, .frame:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.action[disabled] { opacity: 0.6; cursor: progress; }
+.error { padding: 12px 14px; border-radius: var(--radius); border: 1px solid var(--danger); color: var(--danger); white-space: pre-wrap; }
+.toast { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); background: var(--text); color: var(--bg);
+  padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+.manual-copy { display: block; width: calc(100% - 16px); margin: 0 8px 8px; font: inherit; font-size: 12px; padding: 4px 6px;
+  border: 1px solid var(--accent); border-radius: 6px; background: var(--bg); color: var(--text); }
+.menu { position: fixed; z-index: 10; min-width: 160px; padding: 4px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; }
+.menu button { font: inherit; font-size: 13px; text-align: left; padding: 6px 10px; border: 0; border-radius: 5px;
+  background: transparent; color: var(--text); cursor: pointer; }
+.menu button:hover, .menu button:focus-visible { background: var(--surface); outline: none; }
