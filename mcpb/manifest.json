@@ -39,6 +39,7 @@
     { "name": "generate_image", "description": "Generate images from a text prompt." },
     { "name": "edit_image", "description": "Edit an image or compose from reference images, optionally with a mask." },
     { "name": "upload_images", "description": "Open an upload panel so the user can hand images from their computer to edit_image." },
+    { "name": "collect_uploads", "description": "Wait for the images the user sends from the upload panel." },
     { "name": "check_config", "description": "Check the endpoint, key, deployments, and rate-limit state." }
   ],
   "user_config": {

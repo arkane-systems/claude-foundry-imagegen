@@ -7,7 +7,7 @@ import pytest
 
 from conftest import png_bytes
 from foundry_imagegen.images import ValidationError, looks_like_sandbox_path, resolve_input_path
-from foundry_imagegen.uploads import STAGE_TTL, UploadBroker, UploadCancelled, UploadTimedOut
+from foundry_imagegen.uploads import REQUEST_TTL, STAGE_TTL, UploadBroker, UploadCancelled, UploadTimedOut
 
 
 def item(data: bytes, name="photo.png", **extra):
@@ -56,28 +56,37 @@ def test_session_cleanup_and_ttl_sweep(tmp_path):
     assert not stale.exists() and fresh.exists()
 
 
-async def test_deliver_cancel_timeout_orphans(tmp_path):
-    b = UploadBroker(tmp_path / "stage")
+async def test_request_deliver_collect_cancel_timeout(tmp_path):
+    clock = {"t": 1000.0}
+    b = UploadBroker(tmp_path / "stage", clock=lambda: clock["t"])
     images = b.stage([item(png_bytes()), item(png_bytes(), name="b.png")])
 
-    pending = b.open_request("7", max_files=1)
-    async with anyio.create_task_group() as tg:
-        tg.start_soon(lambda: anyio.sleep(0.01))
-        b.deliver("7", images)
-    got = await b.wait(pending, 5)
-    assert got == images[:1]
+    request = b.open_request(max_files=1, purpose="photo")
+    assert b.get(None) is request and b.get(request.id) is request
+    assert b.deliver(request.id, images) is request
+    assert await b.collect(request, 5) == images[:1]
+    assert b.get(request.id) is None  # collected requests close
 
-    pending = b.open_request("8", 1)
-    assert b.cancel(None)  # unknown id → newest open request
+    request = b.open_request(1)
+    assert b.cancel(None)  # no id → newest open request
     with pytest.raises(UploadCancelled):
-        await b.wait(pending, 5)
+        await b.collect(request, 5)
+    assert b.deliver(request.id, images) is None
 
-    pending = b.open_request("9", 1)
+    request = b.open_request(1)
     with pytest.raises(UploadTimedOut):
-        await b.wait(pending, 0.05, tick=0.01)
+        await b.collect(request, 0.05, tick=0.01)
+    # A timed-out collect leaves the request open; a later delivery is still collected.
+    assert b.deliver(request.id, images) is request
+    assert await b.collect(request, 5) == images[:1]
 
-    assert not b.deliver("10", images)  # nobody waiting → kept for the next request
-    assert b.take_orphans() == images and b.take_orphans() is None
+
+def test_requests_expire(tmp_path):
+    clock = {"t": 1000.0}
+    b = UploadBroker(tmp_path / "stage", clock=lambda: clock["t"])
+    request = b.open_request(1)
+    clock["t"] += REQUEST_TTL + 1
+    assert b.get(request.id) is None and b.get(None) is None
 
 
 @pytest.mark.parametrize(

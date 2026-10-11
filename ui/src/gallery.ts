@@ -5,7 +5,7 @@ import {
   applyHostStyleVariables,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps/app-with-deps";
-import { UploadPanel } from "./upload";
+import { UploadPanel, type UploadRequestInfo } from "./upload";
 
 interface ImageInfo {
   path: string;
@@ -303,10 +303,12 @@ let uploadMode = false;
 
 app.ontoolinput = (params) => {
   const args = (params.arguments ?? {}) as { prompt?: string; n?: number; size?: string; quality?: string };
-  // generate_image and edit_image always carry a prompt; upload_images never does.
+  // generate_image and edit_image always carry a prompt; upload_images never does. The panel itself is
+  // drawn from the upload_images result (which carries the request id); hosts may not deliver this
+  // input until then anyway.
   if (args.prompt === undefined) {
     uploadMode = true;
-    uploadPanel.show(args as { purpose?: string; max_files?: number });
+    showStatus("Opening the upload panel…");
     return;
   }
   const what = [args.n && args.n > 1 ? `${args.n} images` : "1 image", args.size, args.quality]
@@ -315,18 +317,14 @@ app.ontoolinput = (params) => {
   showStatus(`Generating ${what}…`, args.prompt ?? "");
 };
 
-app.ontoolcancelled = () => {
-  if (uploadMode) uploadPanel.finish("cancelled", "");
-  else showError("The request was cancelled.");
-};
+app.ontoolcancelled = () => showError("The request was cancelled.");
 
 app.ontoolresult = (result) => {
   const content = (result.content ?? []) as ContentBlock[];
-  const upload = result.structuredContent as { kind?: string; status?: string; images?: { name: string }[] } | undefined;
-  if (uploadMode || upload?.kind === "upload") {
-    if (result.isError) uploadPanel.finish("error", textOf(content) || "The upload failed.");
-    else if (upload?.status === "cancelled") uploadPanel.finish("cancelled", "");
-    else uploadPanel.finish("received", (upload?.images ?? []).map((i) => i.name).join(", ") || "the image");
+  const upload = result.structuredContent as (UploadRequestInfo & { kind?: string; status?: string }) | undefined;
+  if (upload?.kind === "upload" || uploadMode) {
+    if (result.isError || !upload?.request_id) showError(textOf(content) || "Couldn't open the upload panel.");
+    else uploadPanel.show(upload);
     return;
   }
   const data = result.structuredContent as ResultData | undefined;

@@ -15,7 +15,7 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | `imagine` skill (`/foundry-imagegen:imagine <idea>`) | Turns a rough idea into a structured prompt, asks up to 3 clarifying questions, picks size, quality, and format, reviews the result, and iterates |
 | `generate_image` tool | Text to image: any size up to 4K, quality `low`…`max`, 1–10 variations, PNG/JPEG, transparent backgrounds |
 | `edit_image` tool | Edits an image, or composes from up to 16 reference images, with an optional mask |
-| `upload_images` tool | Opens an upload panel in Claude Desktop so you can hand Claude images from your computer for editing |
+| `upload_images` / `collect_uploads` tools | Open an upload panel in Claude Desktop so you can hand Claude images from your computer for editing, then wait for them |
 | `check_config` tool | Checks your endpoint, key, and deployments, and shows the rate-limit state |
 | Gallery widget | In Claude Desktop, shows results with **Download**, **Copy image**, **Show in folder**, and **Copy path**, available as buttons and on right-click |
 | Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
@@ -137,9 +137,10 @@ Examples in Claude Desktop:
 
 > *(photo attached)* Turn this into a watercolor painting.
 
-Claude can see the attachment but the image server can't, so Claude opens the upload panel. Drop,
-choose, or paste **the same photo** and click **Send to Claude**. Claude then refines the prompt as
-usual, shows it to you, and runs the edit.
+Claude can see the attachment but the image server can't, so Claude opens the upload panel and waits.
+Drop, choose, or paste **the same photo** and click **Send to Claude**. Claude then refines the prompt
+as usual, shows it to you, and runs the edit. If you take more than about two minutes, Claude checks
+back with you and keeps waiting. The panel stays open.
 
 > I've got a photo of my dog somewhere in my Pictures. Put a little party hat on him.
 

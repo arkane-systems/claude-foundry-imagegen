@@ -16,9 +16,12 @@ extension (`.mcpb`).
     - `images.py`: parameter and input validation, saving, previews, and `index.jsonl`.
     - `server.py`: tools, MCP Apps registration, and the app-only `fetch_image`/`reveal_image`/`copy_image_to_clipboard`/
       `stage_upload`/`cancel_upload` tools.
-    - `uploads.py`: `upload_images` support. Chat attachments live in Claude's sandbox, unreadable by the server, so the
-      widget sends files straight to the server, which stages them in the user cache dir (deleted at exit, 24 h TTL)
-      and records name/size/SHA-256 in `index.jsonl` instead of the temporary path.
+    - `uploads.py`: `upload_images` / `collect_uploads`. Chat attachments live in Claude's sandbox, unreadable by the
+      server, so `upload_images` opens a request and returns at once (Claude Desktop only delivers a widget's
+      input/result after its tool call finishes, so a blocking call can never show its own panel); the widget sends
+      files straight to the server (`stage_upload`), and `collect_uploads` waits for them (≤ 180 s, below Desktop's
+      ~4 min tool timeout). Staged copies live in the user cache dir (deleted at exit, 24 h TTL); `index.jsonl`
+      records name/size/SHA-256 instead of the temporary path.
     - `clipboard.py`: OS clipboard from the server process (PowerShell, osascript/pbcopy, wl-copy/xclip). The gallery's
       sandboxed frame usually can't write to the clipboard itself, so its Copy actions go through this.
     - `ui/gallery.html`: **build output** of `ui/`. It is committed so users never need Node.
@@ -32,6 +35,7 @@ extension (`.mcpb`).
 ```bash
 cd plugins/foundry-imagegen/server && uv run pytest                  # unit tests
 cd ui && npm install && npm run typecheck && npm run build           # rebuild gallery.html
+cd ui && npm run test:widget                                         # widget scenarios in headless Chromium
 claude plugin validate plugins/foundry-imagegen && claude plugin validate .
 ./scripts/build-mcpb.sh                                              # dist/foundry-imagegen-<ver>.mcpb
 python3 scripts/bump-version.py [new-version]                        # check / set the version
@@ -45,4 +49,6 @@ claude --plugin-dir plugins/foundry-imagegen                         # try the p
   `env` maps, `config.py`, and the README settings table.
 - Validate locally before calling the service. Quota is scarce: at most 5 requests per minute, sometimes 2.
 - Tool errors are returned as `CallToolResult(is_error=True)` with a message the user can act on.
-- After changing `ui/src/*`, rebuild and commit `server/src/foundry_imagegen/ui/gallery.html`.
+- After changing `ui/src/*`, rebuild and commit `server/src/foundry_imagegen/ui/gallery.html`, and run `test:widget`.
+- MCP Apps in Claude Desktop: a widget gets its tool input and result only after the call returns, and tool calls
+  time out after about 4 minutes. Never make a widget's own tool call wait on the user.

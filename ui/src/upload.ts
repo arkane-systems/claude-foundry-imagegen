@@ -2,8 +2,9 @@
 // sends them straight to the server (stage_upload), so the bytes never pass through the model.
 import type { App } from "@modelcontextprotocol/ext-apps/app-with-deps";
 
-interface UploadArgs {
-  purpose?: string;
+export interface UploadRequestInfo {
+  request_id: string;
+  purpose?: string | null;
   max_files?: number;
 }
 
@@ -22,6 +23,7 @@ export class UploadPanel {
   private maxFiles = 1;
   private active = false;
   private finished = false;
+  private requestIdValue: string | undefined;
 
   constructor(
     private readonly app: App,
@@ -66,10 +68,14 @@ export class UploadPanel {
     $("cancel").addEventListener("click", () => void this.cancel());
   }
 
-  show(args: UploadArgs): void {
+  /** Draw the panel for an open upload request (from the upload_images result). */
+  show(args: UploadRequestInfo): void {
     this.active = true;
     this.finished = false;
+    this.requestIdValue = args.request_id;
     this.picked = [];
+    $("upload").classList.remove("locked");
+    $<HTMLButtonElement>("cancel").disabled = false;
     this.maxFiles = Math.max(1, Math.min(16, args.max_files ?? 1));
     $<HTMLInputElement>("file-input").multiple = this.maxFiles > 1;
     $("upload-title").textContent = this.maxFiles > 1 ? `Add up to ${this.maxFiles} images for Claude` : "Add an image for Claude";
@@ -82,19 +88,18 @@ export class UploadPanel {
     this.setStatus("");
   }
 
-  /** Called with the upload_images tool result. */
-  finish(status: "received" | "cancelled" | "error", detail: string): void {
+  /** Lock the panel in a final state; the result of the waiting collect_uploads call goes to Claude, not here. */
+  finish(message: string): void {
     this.finished = true;
     this.active = false;
     $("upload").classList.add("locked");
     $<HTMLButtonElement>("send").disabled = true;
     $<HTMLButtonElement>("cancel").disabled = true;
-    this.setStatus(status === "received" ? `Claude received ${detail}.` : status === "cancelled" ? "Upload cancelled." : detail);
+    this.setStatus(message);
   }
 
   private requestId(): string | undefined {
-    const id = this.app.getHostContext()?.toolInfo?.id;
-    return id === undefined || id === null ? undefined : String(id);
+    return this.requestIdValue;
   }
 
   private async add(files: File[]): Promise<void> {
@@ -157,8 +162,8 @@ export class UploadPanel {
       }));
       const result = await this.app.callServerTool({ name: "stage_upload", arguments: { files, request_id: this.requestId() } });
       if (result.isError) throw new Error(textOf(result.content) || "The server rejected the upload.");
-      $("upload").classList.add("locked");
-      this.setStatus("Sent — Claude is continuing.");
+      const names = this.picked.map((p) => p.file.name).join(", ");
+      this.finish(`Sent ${names} to Claude.`);
     } catch (err) {
       button.disabled = false;
       this.setStatus(`Upload failed: ${(err as Error).message}`);
@@ -169,7 +174,7 @@ export class UploadPanel {
     $<HTMLButtonElement>("cancel").disabled = true;
     try {
       await this.app.callServerTool({ name: "cancel_upload", arguments: { request_id: this.requestId() } });
-      this.setStatus("Cancelling…");
+      this.finish("Upload cancelled.");
     } catch (err) {
       $<HTMLButtonElement>("cancel").disabled = false;
       this.setStatus(`Couldn't cancel: ${(err as Error).message}`);

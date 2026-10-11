@@ -1,9 +1,15 @@
 """Hand images from the user to the server without passing their bytes through the model.
 
 In Claude Desktop, files attached to a chat land in Claude's sandbox, which the server (running on the
-user's computer) can't read. `upload_images` instead shows a drop zone in the gallery widget; the
-widget sends the files straight to the server, which stages them in a temporary cache and returns
-their paths to the waiting tool call.
+user's computer) can't read. Instead:
+
+1. `upload_images` opens an upload request and returns at once; the gallery widget renders an upload
+   panel from that result. (Desktop doesn't deliver a widget's input while its tool call is still
+   running, so the panel can't come from a call that blocks.)
+2. The user drops, picks, or pastes images; the widget sends them straight to the server
+   (`stage_upload`), which stages them in a temporary cache and attaches them to the request.
+3. `collect_uploads` waits (bounded, below host tool timeouts) for the request to be fulfilled or
+   cancelled, and returns the staged paths.
 
 Staged copies are temporary: removed when the server exits and, for anything left behind by a crash,
 after STAGE_TTL. The index records each upload's original file name, size, and SHA-256 instead of the
@@ -34,9 +40,8 @@ from .config import APP_NAME
 from .images import INPUT_FORMATS, MAX_REFERENCE_BYTES, MAX_REFERENCE_IMAGES, ValidationError
 
 STAGE_TTL = 24 * 3600
-# A delivery that arrives after its upload_images call ended (timed out on the host side, say) is
-# kept this long so the next upload_images call can pick it up immediately.
-ORPHAN_TTL = 15 * 60
+# How long an unfulfilled upload request stays open for the widget and collect_uploads.
+REQUEST_TTL = 30 * 60
 
 
 def default_stage_root() -> Path:
@@ -65,9 +70,11 @@ class UploadedImage:
 
 
 @dataclass
-class _Pending:
-    request_id: str
+class UploadRequest:
+    id: str
     max_files: int
+    purpose: str | None
+    created: float
     done: anyio.Event = field(default_factory=anyio.Event)
     images: list[UploadedImage] | None = None
     cancelled: bool = False
@@ -90,8 +97,7 @@ class UploadBroker:
     def __init__(self, stage_root: Path | None = None, *, clock=time.time):
         self.stage_root = stage_root or default_stage_root()
         self._clock = clock
-        self._pending: dict[str, _Pending] = {}
-        self._orphans: list[tuple[float, list[UploadedImage]]] = []
+        self._requests: dict[str, UploadRequest] = {}
         self._by_path: dict[Path, UploadedImage] = {}
         self._session_dirs: list[Path] = []
         self.sweep()
@@ -182,65 +188,57 @@ class UploadBroker:
         image = self._by_path.get(path.resolve())
         return image.provenance() if image else None
 
-    # ---- request / delivery --------------------------------------------------------------------
+    # ---- requests ------------------------------------------------------------------------------
 
-    def open_request(self, request_id: str | None, max_files: int) -> _Pending:
-        request_id = request_id or uuid.uuid4().hex
-        pending = _Pending(request_id, max_files)
-        self._pending[request_id] = pending
-        return pending
+    def _prune(self) -> None:
+        horizon = self._clock() - REQUEST_TTL
+        for request_id in [r.id for r in self._requests.values() if r.created < horizon]:
+            del self._requests[request_id]
 
-    def close_request(self, pending: _Pending) -> None:
-        self._pending.pop(pending.request_id, None)
+    def open_request(self, max_files: int, purpose: str | None = None) -> UploadRequest:
+        self._prune()
+        request = UploadRequest(uuid.uuid4().hex[:12], max_files, purpose, self._clock())
+        self._requests[request.id] = request
+        return request
 
-    def take_orphans(self) -> list[UploadedImage] | None:
-        horizon = self._clock() - ORPHAN_TTL
-        self._orphans = [(t, imgs) for t, imgs in self._orphans if t >= horizon]
-        if not self._orphans:
+    def get(self, request_id: str | None) -> UploadRequest | None:
+        """The named request, or the newest open one when no id is given."""
+        self._prune()
+        if request_id:
+            return self._requests.get(request_id)
+        return next(reversed(self._requests.values()), None)
+
+    def deliver(self, request_id: str | None, images: list[UploadedImage]) -> UploadRequest | None:
+        request = self.get(request_id)
+        if request is None or request.cancelled:
             return None
-        _, images = self._orphans.pop()
-        return images
-
-    def _target(self, request_id: str | None) -> _Pending | None:
-        if request_id and request_id in self._pending:
-            return self._pending[request_id]
-        # Hosts may not tell the widget which tool call it belongs to; use the newest open request.
-        return next(reversed(self._pending.values()), None)
-
-    def deliver(self, request_id: str | None, images: list[UploadedImage]) -> bool:
-        """Hand staged images to the waiting request. Returns False if none was waiting (kept as orphan)."""
-        pending = self._target(request_id)
-        if pending is None:
-            self._orphans.append((self._clock(), images))
-            return False
-        pending.images = images[: pending.max_files]
-        pending.done.set()
-        return True
+        request.images = images[: request.max_files]
+        request.done.set()
+        return request
 
     def cancel(self, request_id: str | None) -> bool:
-        pending = self._target(request_id)
-        if pending is None:
+        request = self.get(request_id)
+        if request is None:
             return False
-        pending.cancelled = True
-        pending.done.set()
+        request.cancelled = True
+        request.done.set()
         return True
 
-    async def wait(self, pending: _Pending, timeout: float, on_tick=None, tick: float = 10.0) -> list[UploadedImage]:
+    async def collect(self, request: UploadRequest, timeout: float, on_tick=None, tick: float = 10.0) -> list[UploadedImage]:
+        """Wait for the request to be fulfilled. On timeout the request stays open for another try."""
         deadline = anyio.current_time() + timeout
-        try:
-            while not pending.done.is_set():
-                remaining = deadline - anyio.current_time()
-                if remaining <= 0:
-                    raise UploadTimedOut()
-                with anyio.move_on_after(min(tick, remaining)):
-                    await pending.done.wait()
-                if not pending.done.is_set() and on_tick is not None:
-                    await on_tick(max(0.0, deadline - anyio.current_time()))
-        finally:
-            self.close_request(pending)
-        if pending.cancelled:
+        while not request.done.is_set():
+            remaining = deadline - anyio.current_time()
+            if remaining <= 0:
+                raise UploadTimedOut()
+            with anyio.move_on_after(min(tick, remaining)):
+                await request.done.wait()
+            if not request.done.is_set() and on_tick is not None:
+                await on_tick(max(0.0, deadline - anyio.current_time()))
+        self._requests.pop(request.id, None)
+        if request.cancelled:
             raise UploadCancelled()
-        return pending.images or []
+        return request.images or []
 
 
 _broker: UploadBroker | None = None

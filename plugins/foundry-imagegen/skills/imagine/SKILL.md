@@ -37,8 +37,10 @@ Infer what you reasonably can (an existing logo's palette, a README's tone, a sl
 read files there. In Claude Code, project files and paths the user gives you work directly. In
 Claude Desktop and on the web, an image attached to the chat lives in *your* sandbox
 (`/mnt/user-data/...`) — you can see it, but `edit_image` cannot read it. Don't pass sandbox paths;
-instead call `upload_images` (with a short `purpose`, and `max_files` if several images are needed),
-tell the user to drop or paste the image(s) into the panel that appears, and use the returned paths.
+instead call `upload_images` (with a short `purpose`, and `max_files` if several images are needed).
+It returns at once and shows an upload panel. Tell the user to drop, choose, or paste the image(s)
+there and click **Send to Claude**, then call `collect_uploads` with the `request_id`; it waits and
+returns the paths to use. If it reports nothing yet, check with the user and call it again.
 If the user would rather, or the panel doesn't work, ask for the image's path on their computer.
 Generated images need neither: their paths are already in earlier tool results.
 
