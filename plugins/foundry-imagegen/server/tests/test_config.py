@@ -151,3 +151,32 @@ def test_pictures_variable_follows_platform_pictures_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(platformdirs, "user_pictures_dir", lambda: str(share))
     s = load_settings(base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR="${PICTURES}/Foundry Images"), config_path=tmp_path / "none.toml")
     assert s.output_dir == share / "Foundry Images"
+
+
+@pytest.mark.parametrize(
+    "raw,platform,expected",
+    [
+        ('"C:\\Users\\me\\My Pictures\\a.png"', "win32", "C:\\Users\\me\\My Pictures\\a.png"),  # Explorer "Copy as path"
+        ("C:\\Users\\me\\a.png", "win32", "C:\\Users\\me\\a.png"),  # unquoted stays as is
+        ("'/Users/me/My Photo.png'", "darwin", "/Users/me/My Photo.png"),
+        ("/Users/me/My\\ Photo\\ \\(1\\).png", "darwin", "/Users/me/My Photo (1).png"),  # terminal drag
+        ("C:\\dir\\ name\\a.png", "win32", "C:\\dir\\ name\\a.png"),  # backslashes are separators on Windows
+        ("\u201c/home/me/a.png\u201d", "linux", "/home/me/a.png"),  # smart quotes from a chat or doc
+        ("`/home/me/a.png`", "linux", "/home/me/a.png"),  # Markdown code
+        ("<file:///home/me/My%20Photo.png>", "linux", "/home/me/My Photo.png"),
+        ("file:///C:/Users/me/a%20b.png", "win32", "C:/Users/me/a b.png"),
+        ("file://server/share/a.png", "win32", "//server/share/a.png"),
+        ("file://localhost/home/me/a.png", "linux", "/home/me/a.png"),
+        ('"unbalanced', "linux", '"unbalanced'),
+        ("  /home/me/a.png \n", "linux", "/home/me/a.png"),
+    ],
+)
+def test_unquote_path(raw, platform, expected):
+    from foundry_imagegen.config import unquote_path
+
+    assert unquote_path(raw, platform) == expected
+
+
+def test_output_dir_accepts_quoted_value(tmp_path):
+    s = load_settings(base_env(FOUNDRY_IMAGEGEN_OUTPUT_DIR=f'"{tmp_path / "out dir"}"'), config_path=tmp_path / "none.toml")
+    assert s.output_dir == tmp_path / "out dir"

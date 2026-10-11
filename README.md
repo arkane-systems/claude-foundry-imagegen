@@ -121,6 +121,41 @@ Just ask:
 Claude shows you the final prompt and settings before generating. It reviews the result, offers
 targeted follow-up edits, and links to the saved files.
 
+### Editing your own images
+
+The image server runs on your computer, so the images you edit have to be files on your computer,
+and Claude needs their paths:
+
+- **Claude Code:** files in your project, or any path you give.
+- **Claude Desktop (Chat and Cowork):** an image you **attach to the message** goes into Claude's
+  own sandbox, which the image server can't read. Claude can see it, but to edit it Claude will ask
+  for the file's path on your computer. You can also give the path straight away.
+
+To copy a file's path:
+
+- **Windows:** select the file in Explorer and press **Ctrl+Shift+C**, or right-click it and choose
+  **Copy as path**. Network paths such as `\\server\share\photo.jpg` work too.
+- **macOS:** select the file in Finder and press **Option-Command-C**.
+- **Linux:** most file managers copy a `file://` link with Ctrl+C. Paste that as it is.
+
+Paste the path as it comes. Quotes (`"…"`, `'…'`, `` `…` ``, smart quotes), `file://` links, and
+backslash-escaped spaces from a terminal are all handled.
+
+Examples:
+
+> Edit `"C:\Users\you\Pictures\beach.jpg"`: remove the people in the background.
+
+> *(photo attached)* Turn this into a watercolor painting.
+
+Claude explains that it needs the file on your computer and asks for its path. Paste it, and Claude
+refines the prompt (using what it saw in the attachment), shows it to you, and runs the edit.
+
+> Put the logo from `\\server\share\logo.png` on the mug in `"D:\shots\mug.jpg"`.
+
+With several images, Claude's prompt says which one is being edited and what each of the others is for.
+
+Images generated earlier in the conversation need no paths. Claude already knows where they are.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -130,6 +165,7 @@ targeted follow-up edits, and links to the saved files.
 | "Deployment … was not found" | Use the deployment name from the Foundry portal, not the model name, if they differ |
 | "Rate limit: the next request slot opens at …" | The queue wait would exceed `max_wait_seconds`. Wait, raise the setting, or [request more quota](https://learn.microsoft.com/azure/foundry/openai/quotas-limits) |
 | "The service's safety system blocked …" | The prompt or the output was filtered. Rephrase |
+| "… is in Claude's sandbox …" | You attached the image to the chat. Give Claude the file's path on your computer instead (see [Editing your own images](#editing-your-own-images)) |
 | Plugin tools missing in Claude Code | Check that `uv` is on `PATH`, then run `/mcp` to see the server status |
 
 ## Development

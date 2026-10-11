@@ -6,12 +6,15 @@ import base64
 import io
 import json
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from PIL import Image
+
+from .config import unquote_path
 
 QUALITIES = ("auto", "low", "medium", "high", "xhigh", "max")
 FORMATS = ("png", "jpeg", "webp")
@@ -139,16 +142,43 @@ class InputImage:
     height: int
 
 
+# Where Claude's own sandbox keeps chat attachments and scratch files. The image server runs on the
+# user's computer, so these paths never exist for it.
+SANDBOX_PREFIXES = ("/mnt/user-data/", "/mnt/data/", "/mnt/outputs/", "/home/claude/")
+
+SANDBOX_HINT = (
+    "{raw!r} is in Claude's sandbox (where files attached to a chat are stored), so the image server on "
+    "the user's computer can't read it. Ask the user for the image's path on their computer instead. On "
+    "Windows: select the file in Explorer and press Ctrl+Shift+C (or right-click > Copy as path). On "
+    "macOS: select it in Finder and press Option-Command-C. Then paste the path into the chat; quotes "
+    "around it are fine."
+)
+
+
+def looks_like_sandbox_path(raw: str, platform: str = sys.platform) -> bool:
+    normalized = raw.strip().replace("\\", "/")
+    if normalized.startswith(SANDBOX_PREFIXES):
+        return True
+    # A POSIX absolute path can't be a local file on Windows.
+    return platform == "win32" and normalized.startswith("/") and not normalized.startswith("//")
+
+
 def resolve_input_path(raw: str, bases: list[Path]) -> Path:
-    path = Path(raw).expanduser()
-    if path.is_absolute():
-        candidates = [path]
-    else:
-        candidates = [base / path for base in bases] + [Path.cwd() / path]
+    # Try the path exactly as given first, then with copy/paste wrapping removed (quotes, file:// URLs,
+    # shell escapes), so a real file whose name contains such characters still wins.
+    candidates: list[Path] = []
+    for form in dict.fromkeys([raw, unquote_path(raw)]):
+        path = Path(form).expanduser()
+        if path.is_absolute():
+            candidates.append(path)
+        else:
+            candidates += [base / path for base in bases] + [Path.cwd() / path]
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()
-    tried = ", ".join(str(c) for c in candidates)
+    if looks_like_sandbox_path(unquote_path(raw)):
+        raise ValidationError(SANDBOX_HINT.format(raw=raw))
+    tried = ", ".join(str(c) for c in dict.fromkeys(candidates))
     raise ValidationError(f"Image file not found: {raw!r} (looked in: {tried}).")
 
 

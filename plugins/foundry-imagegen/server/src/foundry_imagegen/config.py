@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import platformdirs
 
@@ -135,8 +136,45 @@ def _read_config_file(path: Path) -> dict[str, object]:
     return data
 
 
+# Wrappers that copied paths commonly arrive in: Explorer's "Copy as path" and most shells ("…"),
+# shells and scripts ('…'), Markdown (`…`), word processors and chat apps (“…”, ‘…’, «…»), and
+# angle-bracket autolinks (<…>).
+_QUOTE_PAIRS = {
+    '"': '"', "'": "'", "`": "`",
+    "\u201c": "\u201d", "\u201d": "\u201d", "\u201e": "\u201c",
+    "\u2018": "\u2019", "\u2019": "\u2019",
+    "\u00ab": "\u00bb", "\u2039": "\u203a",
+    "<": ">",
+}
+
+
+def unquote_path(raw: str, platform: str = sys.platform) -> str:
+    """Undo the usual ways a copied path gets wrapped; a path with no wrapping comes back unchanged.
+
+    Handles surrounding quotes of the common styles (also nested once, e.g. `"C:\\x"`), file:// URLs
+    (from browsers and Linux/macOS file managers), and shell-escaped characters on POSIX
+    (`My\\ Photo.png`, from dragging a file into a macOS or Linux terminal).
+    """
+    value = raw.strip()
+    for _ in range(2):
+        if len(value) >= 2 and _QUOTE_PAIRS.get(value[0]) == value[-1]:
+            value = value[1:-1].strip()
+    if value.lower().startswith("file:"):
+        parts = urlsplit(value)
+        path = unquote(parts.path)
+        if parts.netloc and parts.netloc.lower() != "localhost":
+            path = f"//{parts.netloc}{path}"  # file://server/share/x → UNC //server/share/x
+        elif platform == "win32" and re.match(r"^/[A-Za-z]:", path):
+            path = path[1:]  # file:///C:/x → C:/x
+        return path
+    if platform != "win32" and re.search(r"\\[ ()'\"&;!$\\]", value):
+        value = re.sub(r"\\(.)", r"\1", value)
+    return value
+
+
 def expand_path(raw: str) -> Path:
     """Expand ~, ${HOME}/${DESKTOP}/${DOCUMENTS}/${PICTURES}/${DOWNLOADS}, and environment variables."""
+    raw = unquote_path(raw)
 
     def folder(match: re.Match[str]) -> str:
         resolver = _FOLDER_VARIABLES.get(match.group(1).upper())

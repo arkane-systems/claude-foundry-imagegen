@@ -120,3 +120,55 @@ def test_unique_names(tmp_path):
 def test_slugify():
     assert slugify("  Hello, World! ") == "hello-world"
     assert slugify("!!!") == "image"
+
+
+@pytest.mark.parametrize(
+    "raw,platform,expected",
+    [
+        ("/mnt/user-data/uploads/cat.png", "linux", True),
+        ("/home/claude/x.png", "darwin", True),
+        ("/home/me/x.png", "linux", False),
+        ("/home/me/x.png", "win32", True),
+        ("\\\\server\\share\\x.png", "win32", False),
+        ("C:\\Users\\me\\x.png", "win32", False),
+    ],
+)
+def test_sandbox_detection(raw, platform, expected):
+    from foundry_imagegen.images import looks_like_sandbox_path
+
+    assert looks_like_sandbox_path(raw, platform) is expected
+
+
+def test_sandbox_path_error_explains(tmp_path):
+    from foundry_imagegen.images import resolve_input_path
+
+    with pytest.raises(ValidationError, match="Claude's sandbox.*path on their computer"):
+        resolve_input_path("/mnt/user-data/uploads/cat.png", [tmp_path])
+    with pytest.raises(ValidationError, match="Claude's sandbox"):
+        resolve_input_path('"/mnt/user-data/uploads/cat.png"', [tmp_path])
+
+
+@pytest.mark.parametrize(
+    "wrapped",
+    [
+        '"{p}"', "'{p}'", "`{p}`", "\u201c{p}\u201d", "\u2018{p}\u2019", "\u00ab{p}\u00bb", "<{p}>",
+        '  "{p}"\n', "`\"{p}\"`", "{p}",
+    ],
+)
+def test_resolve_input_path_accepts_common_quoting(tmp_path, wrapped):
+    from foundry_imagegen.images import resolve_input_path
+
+    target = tmp_path / "my photo (1).png"
+    target.write_bytes(png_bytes())
+    assert resolve_input_path(wrapped.format(p=target), [tmp_path]) == target.resolve()
+
+
+def test_resolve_input_path_prefers_literal_name(tmp_path):
+    from foundry_imagegen.images import resolve_input_path
+
+    plain = tmp_path / "pic.png"
+    plain.write_bytes(png_bytes())
+    quoted = tmp_path / "'pic.png'"  # a real (if odd) file whose name includes quotes
+    quoted.write_bytes(png_bytes())
+    assert resolve_input_path("'pic.png'", [tmp_path]) == quoted.resolve()
+    assert resolve_input_path("pic.png", [tmp_path]) == plain.resolve()
