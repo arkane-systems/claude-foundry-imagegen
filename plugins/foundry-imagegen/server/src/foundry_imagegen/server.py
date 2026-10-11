@@ -30,7 +30,6 @@ from .images import (
     validate_params,
 )
 from .ratelimit import RateLimitExceeded
-from .uploads import UploadCancelled, UploadTimedOut, broker
 
 GALLERY_URI = "ui://foundry-imagegen/gallery.html"
 
@@ -44,9 +43,8 @@ user's idea into a structured prompt and pick parameters. The deployment allows 
 per minute (often 2–5; check_config shows the limit): ask for variations with `n` in one call instead
 of repeated calls; calls queue automatically when the limit is reached. Results are saved to disk; the tool result lists the
 file paths and includes downscaled previews for you to review. Use check_config to diagnose setup.
-Images attached to the chat live in your sandbox, which these tools can't read: call upload_images (it
-shows an upload panel), ask the user to add the image there, then call collect_uploads to receive it.
-Or ask for the image's path on their computer."""
+Images attached to the chat live in your sandbox, which these tools can't read: ask the user for the
+image's path on their computer instead (quotes around a pasted path are fine)."""
 
 _state: dict[str, Any] = {}
 
@@ -74,11 +72,6 @@ def _output_dir(override: str | None, settings: Settings) -> Path:
     if not path.is_absolute():
         path = (settings.project_dir or settings.output_dir) / path
     return path
-
-
-def _input_record(path: Path) -> str | dict[str, Any]:
-    """Uploaded inputs are recorded by origin (name, size, hash) since their staged copy is temporary."""
-    return broker().provenance(path) or str(path)
 
 
 def _known_output_dirs(settings: Settings) -> list[Path]:
@@ -159,8 +152,8 @@ async def _run(
         "prompt": prompt,
         "deployment": dep,
         "params": params.as_request(),
-        "inputs": [_input_record(i.path) for i in inputs],
-        "mask": _input_record(mask_input.path) if mask_input else None,
+        "inputs": [str(i.path) for i in inputs],
+        "mask": str(mask_input.path) if mask_input else None,
         "usage": response.usage,
         "duration_s": round(elapsed, 1),
     }
@@ -367,111 +360,6 @@ async def copy_image_to_clipboard(
     return CallToolResult(content=[TextContent(type="text", text=f"{what} copied to the clipboard.")])
 
 
-@apps.tool(
-    resource_uri=GALLERY_URI,
-    description=(
-        "Let the user hand you image files from their computer, for edit_image. Use this when the user "
-        "attached an image to the chat (attachments live in your sandbox, which the image server can't "
-        "read) or wants to use a local image whose path they don't know. Shows an upload panel in the "
-        "chat and returns immediately with a request_id. Then tell the user to drop, choose, or paste "
-        "the image(s) in the panel and click Send to Claude, and call collect_uploads to wait for them."
-    ),
-    annotations=ToolAnnotations(title="Upload images", read_only_hint=True),
-)
-def upload_images(
-    purpose: Annotated[
-        str | None, Field(description="Short note shown in the panel, e.g. 'the photo to restyle'.")
-    ] = None,
-    max_files: Annotated[int, Field(ge=1, le=16, description="Most images to accept (1–16).")] = 1,
-) -> CallToolResult:
-    request = broker().open_request(max_files, purpose)
-    text = (
-        f"An upload panel is now showing in the chat (request_id {request.id!r}). Tell the user to add "
-        f"{'the image' if max_files == 1 else f'up to {max_files} images'} there and click Send to Claude, "
-        f"then call collect_uploads with request_id {request.id!r} to wait for the upload."
-    )
-    return CallToolResult(
-        content=[TextContent(type="text", text=text)],
-        structured_content={
-            "kind": "upload",
-            "status": "awaiting",
-            "request_id": request.id,
-            "purpose": purpose,
-            "max_files": max_files,
-        },
-    )
-
-
-async def collect_uploads(
-    ctx: Context,
-    request_id: Annotated[str | None, Field(description="The request_id from upload_images.")] = None,
-    wait_seconds: Annotated[
-        int, Field(ge=5, le=180, description="How long to wait for the user before returning (5–180).")
-    ] = 120,
-) -> CallToolResult:
-    uploads = broker()
-    request = uploads.get(request_id)
-    if request is None:
-        return _error("That upload request is unknown or has expired. Call upload_images to open a new panel.")
-    ticks = {"n": 0}
-
-    async def on_tick(remaining: float) -> None:
-        ticks["n"] += 1
-        await ctx.report_progress(ticks["n"], None, f"Waiting for the upload ({remaining:.0f} s left)")
-
-    try:
-        images = await uploads.collect(request, wait_seconds, on_tick)
-    except UploadCancelled:
-        return CallToolResult(
-            content=[TextContent(type="text", text="The user cancelled the upload. Ask how they'd like to proceed.")]
-        )
-    except UploadTimedOut:
-        return CallToolResult(
-            content=[
-                TextContent(
-                    type="text",
-                    text=(
-                        f"Nothing uploaded yet after {wait_seconds} s; the panel is still open. Check with the "
-                        f"user, then call collect_uploads again with request_id {request.id!r} to keep waiting."
-                    ),
-                )
-            ]
-        )
-    lines = [f"The user uploaded {len(images)} image(s); use these paths with edit_image:"]
-    lines += [f"- {img.path} (originally {img.name!r}, {img.width}x{img.height})" for img in images]
-    lines.append("These are temporary copies; they are removed when the server exits.")
-    return CallToolResult(content=[TextContent(type="text", text="\n".join(lines))])
-
-
-@apps.tool(
-    resource_uri=GALLERY_URI,
-    visibility=["app"],
-    description="Receive images from the upload panel for an open upload request.",
-)
-def stage_upload(
-    files: Annotated[list[dict[str, Any]], Field(description="[{name, data (base64), original_path?}]")],
-    request_id: str | None = None,
-) -> CallToolResult:
-    uploads = broker()
-    if uploads.get(request_id) is None:
-        return _error("This upload request has expired. Ask Claude to open a new upload panel.")
-    try:
-        images = uploads.stage(files)
-    except ValidationError as exc:
-        return _error(str(exc))
-    if uploads.deliver(request_id, images) is None:
-        return _error("This upload was cancelled or has expired. Ask Claude to open a new upload panel.")
-    return CallToolResult(
-        content=[TextContent(type="text", text="Sent to Claude.")],
-        structured_content={"images": [i.summary() for i in images]},
-    )
-
-
-@apps.tool(resource_uri=GALLERY_URI, visibility=["app"], description="Cancel an open upload request.")
-def cancel_upload(request_id: str | None = None) -> CallToolResult:
-    cancelled = broker().cancel(request_id)
-    return CallToolResult(content=[TextContent(type="text", text="Cancelled." if cancelled else "Nothing to cancel.")])
-
 apps.add_html_resource(
     GALLERY_URI,
     resources.files("foundry_imagegen").joinpath("ui/gallery.html").read_text(encoding="utf-8"),
@@ -489,14 +377,6 @@ mcp = MCPServer(
     extensions=[apps],
 )
 
-
-mcp.tool(
-    description=(
-        "Wait for the images the user sends from the upload panel opened by upload_images, and return "
-        "their paths for edit_image. Waits up to wait_seconds; if nothing arrives, call it again."
-    ),
-    annotations=ToolAnnotations(title="Collect uploaded images", read_only_hint=True),
-)(collect_uploads)
 
 
 @mcp.tool(

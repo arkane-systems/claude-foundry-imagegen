@@ -5,7 +5,6 @@ import {
   applyHostStyleVariables,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps/app-with-deps";
-import { UploadPanel, type UploadRequestInfo } from "./upload";
 
 interface ImageInfo {
   path: string;
@@ -29,7 +28,7 @@ type ContentBlock = { type: string; text?: string; data?: string; mimeType?: str
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.4" }, { availableDisplayModes: ["inline", "fullscreen"] });
+const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.5" }, { availableDisplayModes: ["inline", "fullscreen"] });
 
 function applyContext(ctx: McpUiHostContext | undefined): void {
   if (!ctx) return;
@@ -298,19 +297,8 @@ function render(data: ResultData, previews: ContentBlock[]): void {
 
 app.onhostcontextchanged = (ctx) => applyContext(ctx as McpUiHostContext);
 
-const uploadPanel = new UploadPanel(app, toast);
-let uploadMode = false;
-
 app.ontoolinput = (params) => {
   const args = (params.arguments ?? {}) as { prompt?: string; n?: number; size?: string; quality?: string };
-  // generate_image and edit_image always carry a prompt; upload_images never does. The panel itself is
-  // drawn from the upload_images result (which carries the request id); hosts may not deliver this
-  // input until then anyway.
-  if (args.prompt === undefined) {
-    uploadMode = true;
-    showStatus("Opening the upload panel…");
-    return;
-  }
   const what = [args.n && args.n > 1 ? `${args.n} images` : "1 image", args.size, args.quality]
     .filter((x) => x && x !== "auto")
     .join(" · ");
@@ -321,12 +309,6 @@ app.ontoolcancelled = () => showError("The request was cancelled.");
 
 app.ontoolresult = (result) => {
   const content = (result.content ?? []) as ContentBlock[];
-  const upload = result.structuredContent as (UploadRequestInfo & { kind?: string; status?: string }) | undefined;
-  if (upload?.kind === "upload" || uploadMode) {
-    if (result.isError || !upload?.request_id) showError(textOf(content) || "Couldn't open the upload panel.");
-    else uploadPanel.show(upload);
-    return;
-  }
   const data = result.structuredContent as ResultData | undefined;
   if (result.isError || !data?.images?.length) {
     showError(textOf(content) || "The image request failed.");

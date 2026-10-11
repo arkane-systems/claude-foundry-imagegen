@@ -15,7 +15,6 @@ It works in **Claude Code** (terminal and the desktop app's Code tab) and in **C
 | `imagine` skill (`/foundry-imagegen:imagine <idea>`) | Turns a rough idea into a structured prompt, asks up to 3 clarifying questions, picks size, quality, and format, reviews the result, and iterates |
 | `generate_image` tool | Text to image: any size up to 4K, quality `low`…`max`, 1–10 variations, PNG/JPEG, transparent backgrounds |
 | `edit_image` tool | Edits an image, or composes from up to 16 reference images, with an optional mask |
-| `upload_images` / `collect_uploads` tools | Open an upload panel in Claude Desktop so you can hand Claude images from your computer for editing, then wait for them |
 | `check_config` tool | Checks your endpoint, key, and deployments, and shows the rate-limit state |
 | Gallery widget | In Claude Desktop, shows results with **Download**, **Copy image**, **Show in folder**, and **Copy path**, available as buttons and on right-click |
 | Rate limiting | Queues requests to respect the deployment's requests-per-minute quota (gpt-image-2.5 allows at most 5, and a deployment may be provisioned lower). The queue is shared across all Claude sessions on the machine. It adopts a lower limit when the service reports one, and it honors the service's `Retry-After` |
@@ -124,46 +123,38 @@ targeted follow-up edits, and links to the saved files.
 
 ### Editing your own images
 
-The image server runs on your computer, so the images you want to edit have to be reachable there:
+The image server runs on your computer, so the images you edit have to be files on your computer,
+and Claude needs their paths:
 
-- **Claude Code:** give a path, either inside the project or anywhere on your computer.
-- **Claude Desktop (Chat and Cowork):** an image you attach to the message goes into Claude's own
-  sandbox, which the image server can't read. Claude will open an **upload panel** in the chat
-  instead. Drop the image there, choose it with the file picker, or paste it with Ctrl+V (⌘V), then
-  click **Send to Claude**. **Cancel** stops the request. You can also give Claude the image's path
-  on your computer, for example `C:\Users\you\Pictures\photo.jpg` or a network path.
+- **Claude Code:** files in your project, or any path you give.
+- **Claude Desktop (Chat and Cowork):** an image you **attach to the message** goes into Claude's
+  own sandbox, which the image server can't read. Claude can see it, but to edit it Claude will ask
+  for the file's path on your computer. You can also give the path straight away.
 
-Examples in Claude Desktop:
+To copy a file's path:
+
+- **Windows:** select the file in Explorer and press **Ctrl+Shift+C**, or right-click it and choose
+  **Copy as path**. Network paths such as `\\server\share\photo.jpg` work too.
+- **macOS:** select the file in Finder and press **Option-Command-C**.
+- **Linux:** most file managers copy a `file://` link with Ctrl+C. Paste that as it is.
+
+Paste the path as it comes. Quotes (`"…"`, `'…'`, `` `…` ``, smart quotes), `file://` links, and
+backslash-escaped spaces from a terminal are all handled.
+
+Examples:
+
+> Edit `"C:\Users\you\Pictures\beach.jpg"`: remove the people in the background.
 
 > *(photo attached)* Turn this into a watercolor painting.
 
-Claude can see the attachment but the image server can't, so Claude opens the upload panel and waits.
-Drop, choose, or paste **the same photo** and click **Send to Claude**. Claude then refines the prompt
-as usual, shows it to you, and runs the edit. If you take more than about two minutes, Claude checks
-back with you and keeps waiting. The panel stays open.
+Claude explains that it needs the file on your computer and asks for its path. Paste it, and Claude
+refines the prompt (using what it saw in the attachment), shows it to you, and runs the edit.
 
-> I've got a photo of my dog somewhere in my Pictures. Put a little party hat on him.
+> Put the logo from `\\server\share\logo.png` on the mug in `"D:\shots\mug.jpg"`.
 
-Claude opens the panel instead of guessing where the file is. You can also just reply with the path.
+With several images, Claude's prompt says which one is being edited and what each of the others is for.
 
-> Put our logo on this mug photo, like it was printed on it.
-
-The panel accepts both images. Claude's prompt says which image is the mug to edit and which is the
-logo to apply.
-
-> I just copied a screenshot of our settings page. Make a dark-mode version of it.
-
-Click in the panel and press Ctrl+V (⌘V). The pasted image needs no file.
-
-Click **Cancel** to stop. Claude asks how you'd like to continue. The panel doesn't appear for
-images generated earlier in the conversation, since Claude already has their paths, or when you
-give a path yourself.
-
-Uploaded copies are temporary: they're kept in the plugin's cache folder only while the server is
-running, and leftovers are removed after 24 hours. `index.jsonl` records an uploaded image by its
-original file name, size, and SHA-256 hash, so you can still tell which file an edit started from.
-Browsers don't reveal a dropped file's location to the page, so the original path is recorded
-only when you give Claude the path yourself.
+Images generated earlier in the conversation need no paths. Claude already knows where they are.
 
 ## Troubleshooting
 
@@ -174,7 +165,7 @@ only when you give Claude the path yourself.
 | "Deployment … was not found" | Use the deployment name from the Foundry portal, not the model name, if they differ |
 | "Rate limit: the next request slot opens at …" | The queue wait would exceed `max_wait_seconds`. Wait, raise the setting, or [request more quota](https://learn.microsoft.com/azure/foundry/openai/quotas-limits) |
 | "The service's safety system blocked …" | The prompt or the output was filtered. Rephrase |
-| "… is in Claude's sandbox …" | You attached the image to the chat. Use the upload panel Claude opens, or give the path on your computer |
+| "… is in Claude's sandbox …" | You attached the image to the chat. Give Claude the file's path on your computer instead (see [Editing your own images](#editing-your-own-images)) |
 | Plugin tools missing in Claude Code | Check that `uv` is on `PATH`, then run `/mcp` to see the server status |
 
 ## Development

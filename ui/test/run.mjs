@@ -27,8 +27,6 @@ writeFileSync(
 
 const expectations = {
   gallery: ["figures=2 status_hidden=true", "menu=Download|Copy image|Show in folder|Copy path", "call copy_image_to_clipboard", "toast=Image copied"],
-  upload: ["panel_visible=true purpose=the photo to restyle", "thumbs=1 send_enabled=true", "call stage_upload request_id=req123 files=holiday.png:true", "upload_status=Sent holiday.png to Claude. locked=true"],
-  "upload-cancel": ["panel_visible=true", "call cancel_upload request_id=req123", "upload_status=Upload cancelled. locked=true"],
 };
 
 const chromium = process.env.CHROMIUM || "chromium";

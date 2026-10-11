@@ -13,20 +13,15 @@ extension (`.mcpb`).
     - `config.py`: settings. Precedence is env vars (`FOUNDRY_IMAGEGEN_*`), then the `config.toml` fallback, then defaults.
     - `client.py`: Foundry HTTP client. Tries the v1 route first and falls back to the legacy route; handles retries, 429 cooldowns, and error mapping.
     - `ratelimit.py`: cross-process RPM limiter (file lock plus JSON state in the user state dir).
-    - `images.py`: parameter and input validation, saving, previews, and `index.jsonl`.
-    - `server.py`: tools, MCP Apps registration, and the app-only `fetch_image`/`reveal_image`/`copy_image_to_clipboard`/
-      `stage_upload`/`cancel_upload` tools.
-    - `uploads.py`: `upload_images` / `collect_uploads`. Chat attachments live in Claude's sandbox, unreadable by the
-      server, so `upload_images` opens a request and returns at once (Claude Desktop only delivers a widget's
-      input/result after its tool call finishes, so a blocking call can never show its own panel); the widget sends
-      files straight to the server (`stage_upload`), and `collect_uploads` waits for them (≤ 180 s, below Desktop's
-      ~4 min tool timeout). Staged copies live in the user cache dir (deleted at exit, 24 h TTL); `index.jsonl`
-      records name/size/SHA-256 instead of the temporary path.
+    - `images.py`: parameter and input validation, saving, previews, and `index.jsonl`. Input paths are tried as given,
+      then with copy/paste wrapping removed (`config.unquote_path`: quotes, file:// URLs, shell escapes). Paths in
+      Claude's sandbox (chat attachments) get an error that tells the user how to copy the real path.
+    - `server.py`: tools, MCP Apps registration, and the app-only `fetch_image`/`reveal_image`/`copy_image_to_clipboard` tools.
     - `clipboard.py`: OS clipboard from the server process (PowerShell, osascript/pbcopy, wl-copy/xclip). The gallery's
       sandboxed frame usually can't write to the clipboard itself, so its Copy actions go through this.
     - `ui/gallery.html`: **build output** of `ui/`. It is committed so users never need Node.
-- `ui/`: source for the gallery MCP App (TypeScript, `@modelcontextprotocol/ext-apps`, esbuild). `upload.ts` is the
-  upload panel shown for `upload_images`.
+- `ui/`: source for the gallery MCP App (TypeScript, `@modelcontextprotocol/ext-apps`, esbuild). `ui/test` is a
+  headless-Chromium test host (`npm run test:widget`).
 - `mcpb/`: the desktop extension manifest and icon. `scripts/build-mcpb.sh` stages the server and packs it.
 - `scripts/bump-version.py`: sets or checks the version across pyproject, `__init__`, plugin.json, the mcpb manifest, and the UI.
 
@@ -51,4 +46,6 @@ claude --plugin-dir plugins/foundry-imagegen                         # try the p
 - Tool errors are returned as `CallToolResult(is_error=True)` with a message the user can act on.
 - After changing `ui/src/*`, rebuild and commit `server/src/foundry_imagegen/ui/gallery.html`, and run `test:widget`.
 - MCP Apps in Claude Desktop: a widget gets its tool input and result only after the call returns, and tool calls
-  time out after about 4 minutes. Never make a widget's own tool call wait on the user.
+  time out after about 4 minutes. In testing, a widget did not respond to input while another tool call was still
+  running. So never make a widget-driven step wait on the user inside a tool call. (An upload panel built that
+  way was dropped in 0.1.5: asking for the image's path is simpler and works everywhere.)

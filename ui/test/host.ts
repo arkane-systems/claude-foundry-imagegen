@@ -47,29 +47,6 @@ const later = (ms: number) => new Promise((r) => setTimeout(r, ms));
       ([...doc().querySelectorAll(".menu button")].find((b) => b.textContent === "Copy image") as HTMLButtonElement).click();
       await later(300);
       log(`toast=${doc().getElementById("toast")!.textContent}`);
-    } else if (scenario === "upload" || scenario === "upload-cancel") {
-      // Like Claude Desktop: the widget gets the input and the finished upload_images result together.
-      await bridge.sendToolInput({ arguments: { purpose: "the photo to restyle", max_files: 1 } });
-      await bridge.sendToolResult({
-        content: [{ type: "text", text: "panel open" }],
-        structuredContent: { kind: "upload", status: "awaiting", request_id: "req123", purpose: "the photo to restyle", max_files: 1 },
-      } as never);
-      await later(200);
-      log(`panel_visible=${!doc().getElementById("upload")!.hidden} purpose=${doc().getElementById("upload-purpose")!.textContent}`);
-      if (scenario === "upload-cancel") {
-        (doc().getElementById("cancel") as HTMLButtonElement).click();
-      } else {
-        const bytes = Uint8Array.from(atob(SAMPLE_PNG), (c) => c.charCodeAt(0));
-        const file = new (win().File)([bytes], "holiday.png", { type: "image/png" });
-        const dt = new (win().DataTransfer)();
-        dt.items.add(file);
-        doc().getElementById("dropzone")!.dispatchEvent(new (win().DragEvent)("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
-        await later(300);
-        log(`thumbs=${doc().querySelectorAll("#picked figure").length} send_enabled=${!(doc().getElementById("send") as HTMLButtonElement).disabled}`);
-        (doc().getElementById("send") as HTMLButtonElement).click();
-      }
-      await later(400);
-      log(`upload_status=${doc().getElementById("upload-status")!.textContent} locked=${doc().getElementById("upload")!.classList.contains("locked")}`);
     }
     log("done");
   };

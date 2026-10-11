@@ -109,79 +109,16 @@ async def test_copy_to_clipboard_tool(settings, monkeypatch):
         assert denied.is_error
 
 
-@pytest.fixture
-def upload_broker(tmp_path, monkeypatch):
-    from foundry_imagegen import uploads
-
-    b = uploads.UploadBroker(tmp_path / "stage")
-    monkeypatch.setattr(uploads, "_broker", b)
-    return b
+async def test_edit_with_sandbox_path_explains():
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("edit_image", {"prompt": "x", "images": ["/mnt/user-data/uploads/cat.png"]})
+    assert result.is_error and "path on their computer" in result.content[0].text
 
 
 @respx.mock
-async def test_upload_then_edit_records_provenance(settings, upload_broker):
-    import base64
-
-    import anyio
-
-    edit_route = respx.post(f"{V1}/edits").mock(return_value=ok())
-    data = png_bytes()
+async def test_edit_accepts_quoted_pasted_path(tmp_path):
+    (tmp_path / "my photo.png").write_bytes(png_bytes())
+    respx.post(f"{V1}/edits").mock(return_value=ok())
     async with Client(server.mcp) as client:
-        # upload_images returns at once: the panel is drawn from this finished result.
-        opened = await client.call_tool("upload_images", {"purpose": "photo to edit"})
-        assert not opened.is_error
-        info = opened.structured_content
-        assert info["kind"] == "upload" and info["status"] == "awaiting"
-        request_id = info["request_id"]
-
-        results = {}
-
-        async def collect():
-            results["collected"] = await client.call_tool("collect_uploads", {"request_id": request_id})
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(collect)
-            await anyio.sleep(0.2)
-            staged = await client.call_tool(
-                "stage_upload",
-                {"request_id": request_id, "files": [{"name": "holiday.png", "data": base64.b64encode(data).decode()}]},
-            )
-            assert not staged.is_error, staged.content[0].text
-
-        text = results["collected"].content[0].text
-        path = text.split("\n")[1].split(" (originally")[0].removeprefix("- ")
-        edited = await client.call_tool("edit_image", {"prompt": "make it night", "images": [path]})
-        assert not edited.is_error, edited.content[0].text
-    assert edit_route.called
-    record = json.loads((settings.output_dir / "index.jsonl").read_text().splitlines()[-1])
-    assert record["inputs"][0]["uploaded"] == "holiday.png"
-    assert "path" not in record["inputs"][0] and record["inputs"][0]["sha256"]
-
-
-async def test_upload_cancel_and_timeout(upload_broker):
-    import anyio
-
-    async with Client(server.mcp) as client:
-        request_id = (await client.call_tool("upload_images", {})).structured_content["request_id"]
-        waited = await client.call_tool("collect_uploads", {"request_id": request_id, "wait_seconds": 5})
-        assert not waited.is_error and "call collect_uploads again" in waited.content[0].text
-
-        results = {}
-
-        async def collect():
-            results["c"] = await client.call_tool("collect_uploads", {"request_id": request_id})
-
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(collect)
-            await anyio.sleep(0.2)
-            await client.call_tool("cancel_upload", {"request_id": request_id})
-        assert "cancelled" in results["c"].content[0].text
-
-        expired = await client.call_tool("collect_uploads", {"request_id": request_id})
-        assert expired.is_error and "upload_images" in expired.content[0].text
-
-
-async def test_edit_with_sandbox_path_explains(upload_broker):
-    async with Client(server.mcp) as client:
-        result = await client.call_tool("edit_image", {"prompt": "x", "images": ["/mnt/user-data/uploads/cat.png"]})
-    assert result.is_error and "upload_images" in result.content[0].text
+        result = await client.call_tool("edit_image", {"prompt": "x", "images": [f'"{tmp_path / "my photo.png"}"']})
+    assert not result.is_error, result.content[0].text

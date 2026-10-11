@@ -14,6 +14,8 @@ from typing import Any
 
 from PIL import Image
 
+from .config import unquote_path
+
 QUALITIES = ("auto", "low", "medium", "high", "xhigh", "max")
 FORMATS = ("png", "jpeg", "webp")
 BACKGROUNDS = ("auto", "opaque", "transparent")
@@ -146,8 +148,10 @@ SANDBOX_PREFIXES = ("/mnt/user-data/", "/mnt/data/", "/mnt/outputs/", "/home/cla
 
 SANDBOX_HINT = (
     "{raw!r} is in Claude's sandbox (where files attached to a chat are stored), so the image server on "
-    "your computer can't read it. Either call upload_images so the user can drop or paste the image into "
-    "the upload panel, or ask the user for the image's path on their computer."
+    "the user's computer can't read it. Ask the user for the image's path on their computer instead. On "
+    "Windows: select the file in Explorer and press Ctrl+Shift+C (or right-click > Copy as path). On "
+    "macOS: select it in Finder and press Option-Command-C. Then paste the path into the chat; quotes "
+    "around it are fine."
 )
 
 
@@ -160,17 +164,21 @@ def looks_like_sandbox_path(raw: str, platform: str = sys.platform) -> bool:
 
 
 def resolve_input_path(raw: str, bases: list[Path]) -> Path:
-    path = Path(raw).expanduser()
-    if path.is_absolute():
-        candidates = [path]
-    else:
-        candidates = [base / path for base in bases] + [Path.cwd() / path]
+    # Try the path exactly as given first, then with copy/paste wrapping removed (quotes, file:// URLs,
+    # shell escapes), so a real file whose name contains such characters still wins.
+    candidates: list[Path] = []
+    for form in dict.fromkeys([raw, unquote_path(raw)]):
+        path = Path(form).expanduser()
+        if path.is_absolute():
+            candidates.append(path)
+        else:
+            candidates += [base / path for base in bases] + [Path.cwd() / path]
     for candidate in candidates:
         if candidate.is_file():
             return candidate.resolve()
-    if looks_like_sandbox_path(raw):
+    if looks_like_sandbox_path(unquote_path(raw)):
         raise ValidationError(SANDBOX_HINT.format(raw=raw))
-    tried = ", ".join(str(c) for c in candidates)
+    tried = ", ".join(str(c) for c in dict.fromkeys(candidates))
     raise ValidationError(f"Image file not found: {raw!r} (looked in: {tried}).")
 
 
