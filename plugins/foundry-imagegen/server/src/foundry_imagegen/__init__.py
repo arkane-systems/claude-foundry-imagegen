@@ -1,6 +1,6 @@
 """Microsoft Foundry image generation as an MCP server for Claude."""
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 
 def main() -> None:

@@ -1,6 +1,6 @@
 [project]
 name = "foundry-imagegen"
-version = "0.1.3"
+version = "0.1.4"
 description = "MCP server giving Claude image generation via a GPT-image model deployed on Microsoft Foundry."
 authors = [
     { name = "Alistair Young", email = "avatar@arkane-systems.net" }
