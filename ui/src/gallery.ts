@@ -28,7 +28,7 @@ type ContentBlock = { type: string; text?: string; data?: string; mimeType?: str
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.2" }, { availableDisplayModes: ["inline", "fullscreen"] });
+const app = new App({ name: "foundry-imagegen-gallery", version: "0.1.5" }, { availableDisplayModes: ["inline", "fullscreen"] });
 
 function applyContext(ctx: McpUiHostContext | undefined): void {
   if (!ctx) return;

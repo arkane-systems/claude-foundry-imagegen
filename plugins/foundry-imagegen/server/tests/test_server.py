@@ -107,3 +107,18 @@ async def test_copy_to_clipboard_tool(settings, monkeypatch):
         assert not copied.is_error and calls == [("image", Path(path))]
         denied = await client.call_tool("copy_image_to_clipboard", {"path": "/etc/passwd", "content": "path"})
         assert denied.is_error
+
+
+async def test_edit_with_sandbox_path_explains():
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("edit_image", {"prompt": "x", "images": ["/mnt/user-data/uploads/cat.png"]})
+    assert result.is_error and "path on their computer" in result.content[0].text
+
+
+@respx.mock
+async def test_edit_accepts_quoted_pasted_path(tmp_path):
+    (tmp_path / "my photo.png").write_bytes(png_bytes())
+    respx.post(f"{V1}/edits").mock(return_value=ok())
+    async with Client(server.mcp) as client:
+        result = await client.call_tool("edit_image", {"prompt": "x", "images": [f'"{tmp_path / "my photo.png"}"']})
+    assert not result.is_error, result.content[0].text

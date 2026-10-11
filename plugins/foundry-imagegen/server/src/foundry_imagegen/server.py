@@ -42,7 +42,9 @@ Before calling generate_image or edit_image, follow the `imagine` skill (if avai
 user's idea into a structured prompt and pick parameters. The deployment allows only a few requests
 per minute (often 2–5; check_config shows the limit): ask for variations with `n` in one call instead
 of repeated calls; calls queue automatically when the limit is reached. Results are saved to disk; the tool result lists the
-file paths and includes downscaled previews for you to review. Use check_config to diagnose setup."""
+file paths and includes downscaled previews for you to review. Use check_config to diagnose setup.
+Images attached to the chat live in your sandbox, which these tools can't read: ask the user for the
+image's path on their computer instead (quotes around a pasted path are fine)."""
 
 _state: dict[str, Any] = {}
 
@@ -357,6 +359,7 @@ async def copy_image_to_clipboard(
     what = "Image" if content == "image" else "Path"
     return CallToolResult(content=[TextContent(type="text", text=f"{what} copied to the clipboard.")])
 
+
 apps.add_html_resource(
     GALLERY_URI,
     resources.files("foundry_imagegen").joinpath("ui/gallery.html").read_text(encoding="utf-8"),
@@ -373,6 +376,7 @@ mcp = MCPServer(
     version=__version__,
     extensions=[apps],
 )
+
 
 
 @mcp.tool(

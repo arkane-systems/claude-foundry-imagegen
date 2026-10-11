@@ -33,6 +33,16 @@ Work out, from the request, the conversation, and (in a project) the repository:
 
 Infer what you reasonably can (an existing logo's palette, a README's tone, a slide deck's aspect ratio).
 
+**Getting the user's own images to the tools.** The image tools run on the user's computer and can only
+read files there. In Claude Code, project files and paths the user gives you work directly. In
+Claude Desktop and on the web, an image attached to the chat lives in *your* sandbox
+(`/mnt/user-data/...`). You can see it, but `edit_image` cannot read it. Don't pass sandbox paths.
+Instead ask the user for the image's path on their computer, and tell them how to copy it: on
+Windows, select the file in Explorer and press Ctrl+Shift+C (or right-click → Copy as path); on
+macOS, select it in Finder and press Option-Command-C. Quotes around a pasted path are fine. You can
+still use what you see in the attachment to refine the prompt while you wait for the path.
+Generated images don't need this: their paths are already in earlier tool results.
+
 ### 2. Ask only the questions that change the result
 If an answer would materially change the image and you cannot infer it, ask — **at most 3 questions,
 in one round**. Good candidates: intended use / aspect ratio, style direction, exact wording of text,
